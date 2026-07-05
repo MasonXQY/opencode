@@ -12,6 +12,7 @@ import { useKeyboard, useTerminalDimensions } from "@opentui/solid"
 import { useTuiConfig } from "../config"
 import { getScrollAcceleration } from "../util/scroll"
 import { useBindings } from "../keymap"
+import { clipboardCopyState, type ClipboardCopyState } from "../clipboard"
 
 // Sort by how much attention a server needs: auth prompts first, then failures,
 // then healthy servers, and intentionally-off servers last.
@@ -119,7 +120,7 @@ function DialogMcpError(props: { server: McpServer; onBack: () => void }) {
   const { theme } = useTheme()
   const dimensions = useTerminalDimensions()
   const tuiConfig = useTuiConfig()
-  const [copied, setCopied] = createSignal(false)
+  const [copyState, setCopyState] = createSignal<ClipboardCopyState>("idle")
   const error = () => statusMeta(props.server.status, theme).error ?? "Unknown MCP connection error"
   const height = createMemo(() => Math.max(3, Math.floor(dimensions().height / 2) - 5))
   let scroll: ScrollBoxRenderable | undefined
@@ -127,12 +128,24 @@ function DialogMcpError(props: { server: McpServer; onBack: () => void }) {
   onMount(() => dialog.setSize("large"))
 
   const copy = () => {
-    if (!clipboard.write) return
     void clipboard
       .write(error())
-      .then(() => setCopied(true))
-      .catch(toast.error)
+      .then((outcome) => setCopyState(clipboardCopyState(outcome)))
+      .catch((error) => {
+        setCopyState("failed")
+        toast.error(error)
+      })
   }
+
+  const copyLabel = () =>
+    ({
+      idle: "c copy details",
+      confirmed: "✓ copied",
+      "confirmed-partial": "✓ copied (terminal failed)",
+      attempted: "✓ sent",
+      "attempted-partial": "✓ sent (host failed)",
+      failed: "copy failed",
+    })[copyState()]
 
   useBindings(() => ({
     bindings: [{ key: "escape", desc: "Back to MCP servers", group: "Dialog", cmd: props.onBack }],
@@ -174,7 +187,7 @@ function DialogMcpError(props: { server: McpServer; onBack: () => void }) {
       <box flexDirection="row" justifyContent="space-between">
         <text fg={theme.textMuted}>↑↓ scroll</text>
         <text fg={theme.textMuted} onMouseUp={copy}>
-          {copied() ? "✓ copied" : "c copy details"}
+          {copyLabel()}
         </text>
       </box>
     </box>

@@ -12,6 +12,7 @@ import { DialogPrompt } from "../ui/dialog-prompt"
 import { DialogSelect } from "../ui/dialog-select"
 import { Link } from "../ui/link"
 import { useToast } from "../ui/toast"
+import { formatClipboardWriteNotification } from "../clipboard"
 
 const INTEGRATION_PRIORITY: Record<string, number> = {
   opencode: 0,
@@ -278,8 +279,12 @@ function OAuthAuto(props: {
         cmd: () => {
           const value = props.attempt.instructions.match(/[A-Z0-9]{4}-[A-Z0-9]{4,5}/)?.[0] ?? props.attempt.url
           clipboard
-            .write?.(value)
-            .then(() => toast.show({ message: "Copied to clipboard", variant: "info" }))
+            .write(value)
+            .then((outcome) =>
+              toast.show(
+                formatClipboardWriteNotification(outcome, { message: "Copied to clipboard", variant: "info" }),
+              ),
+            )
             .catch(toast.error)
         },
       },

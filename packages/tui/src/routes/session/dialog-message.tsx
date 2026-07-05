@@ -5,6 +5,7 @@ import { useClipboard } from "../../context/clipboard"
 import { useToast } from "../../ui/toast"
 import { useSDK } from "../../context/sdk"
 import { errorMessage } from "../../util/error"
+import { formatClipboardWriteNotification } from "../../clipboard"
 
 export function DialogMessage(props: { messageID: string; sessionID: string; setPrompt?: unknown }) {
   const data = useData()
@@ -46,8 +47,19 @@ export function DialogMessage(props: { messageID: string; sessionID: string; set
                   : "text" in value
                     ? value.text
                     : ""
-            await clipboard.write?.(text)
-            dialog.clear()
+            if (!text) {
+              toast.show({ message: "No text content found in message", variant: "error" })
+              return
+            }
+            try {
+              const outcome = await clipboard.write(text)
+              toast.show(
+                formatClipboardWriteNotification(outcome, { message: "Copied to clipboard", variant: "info" }),
+              )
+              dialog.clear()
+            } catch (error) {
+              toast.error(error)
+            }
           },
         },
         {

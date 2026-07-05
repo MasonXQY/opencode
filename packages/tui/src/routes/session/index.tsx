@@ -63,6 +63,7 @@ import { DialogExportOptions } from "../../ui/dialog-export-options"
 import { sessionEpilogue } from "../../util/presentation"
 import { useTuiConfig } from "../../config"
 import { useClipboard } from "../../context/clipboard"
+import { formatClipboardWriteNotification } from "../../clipboard"
 import { nextThinkingMode, reasoningSummary, useThinkingMode, type ThinkingMode } from "../../context/thinking"
 import { getScrollAcceleration } from "../../util/scroll"
 import { collapseToolOutput } from "../../util/collapse-tool-output"
@@ -683,8 +684,15 @@ export function Session() {
         }
 
         clipboard
-          .write?.(text)
-          .then(() => toast.show({ message: "Message copied to clipboard!", variant: "success" }))
+          .write(text)
+          .then((outcome) =>
+            toast.show(
+              formatClipboardWriteNotification(outcome, {
+                message: "Message copied to clipboard!",
+                variant: "success",
+              }),
+            ),
+          )
           .catch(() => toast.show({ message: "Failed to copy to clipboard", variant: "error" }))
         dialog.clear()
       },
@@ -701,8 +709,13 @@ export function Session() {
           const sessionData = session()
           if (!sessionData) return
           const transcript = formatSessionTranscript(sessionData, messages(), showThinking(), showDetails())
-          await clipboard.write?.(transcript)
-          toast.show({ message: "Session transcript copied to clipboard!", variant: "success" })
+          const outcome = await clipboard.write(transcript)
+          toast.show(
+            formatClipboardWriteNotification(outcome, {
+              message: "Session transcript copied to clipboard!",
+              variant: "success",
+            }),
+          )
         } catch {
           toast.show({ message: "Failed to copy session transcript", variant: "error" })
         }
