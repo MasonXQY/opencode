@@ -1287,6 +1287,12 @@ function TaskDetail(props: {
   const stage = createMemo(() => taskStage(props.task))
   const digest = createMemo(() => eventDigest(events()))
   const errorCount = createMemo(() => digest().errors.length)
+  const currentIndex = createMemo(() =>
+    Math.max(
+      0,
+      chainTasks().findIndex((task) => task.id === props.task.id),
+    ),
+  )
 
   createEffect(() => {
     setEvents(props.task.events)
@@ -1346,7 +1352,7 @@ function TaskDetail(props: {
 
           <TaskTimeline events={events()} />
 
-          <section class="composer-row">
+          <section class="composer-row command-bar" aria-label="Mission command bar">
             <form
               onSubmit={async (event) => {
                 event.preventDefault()
@@ -1356,10 +1362,11 @@ function TaskDetail(props: {
                 props.onRefresh()
               }}
             >
+              <span class="command-prefix">Mission</span>
               <input
                 value={message()}
                 onInput={(event) => setMessage(event.currentTarget.value)}
-                placeholder="Add instruction, handoff note, or approval context..."
+                placeholder="Describe the next instruction, approval, or handoff..."
               />
               <button>Send</button>
             </form>
@@ -1385,15 +1392,16 @@ function TaskDetail(props: {
         </div>
 
         <aside class="task-aside">
-          <div class="agent-stage">
-            <AgentAvatar data={props.data} agent={props.task.agent} />
-            <p>{currentProfile()?.summary ?? "Working on this task."}</p>
-            <Show when={props.task.kind === "orchestration"}>
-              <div class="context-note">
-                Coordinator keeps global context clean; sub-agents work in isolated context shards.
-              </div>
-            </Show>
-          </div>
+          <NodeInspector
+            data={props.data}
+            task={props.task}
+            stage={stage()}
+            profileSummary={currentProfile()?.summary ?? "Working on this task."}
+            chainPosition={currentIndex() + 1}
+            chainTotal={chainTasks().length}
+            eventCount={events().length}
+            errorCount={errorCount()}
+          />
 
           <Show when={parentTask()}>
             {(parent) => (
@@ -1411,6 +1419,66 @@ function TaskDetail(props: {
         </aside>
       </div>
     </article>
+  )
+}
+
+function NodeInspector(props: {
+  data: BootstrapData
+  task: Task
+  stage: string
+  profileSummary: string
+  chainPosition: number
+  chainTotal: number
+  eventCount: number
+  errorCount: number
+}) {
+  return (
+    <section class="node-inspector">
+      <div class="inspector-top">
+        <AgentAvatar data={props.data} agent={props.task.agent} />
+        <span class={`status ${props.task.status}`}>{statusLabel(props.task.status)}</span>
+      </div>
+      <div>
+        <h2>{props.task.kind === "orchestration" ? "Coordinator node" : "Agent node"}</h2>
+        <p>{props.profileSummary}</p>
+      </div>
+      <div class="inspector-steps" aria-label="Node configuration status">
+        <span class="done">Setup</span>
+        <span class="active">Configure</span>
+        <span>Test</span>
+      </div>
+      <dl class="node-fields">
+        <div>
+          <dt>Role</dt>
+          <dd>{props.task.agent}</dd>
+        </div>
+        <div>
+          <dt>Model</dt>
+          <dd>{props.task.model}</dd>
+        </div>
+        <div>
+          <dt>Position</dt>
+          <dd>
+            {props.chainPosition} / {props.chainTotal}
+          </dd>
+        </div>
+        <div>
+          <dt>Scope</dt>
+          <dd>{props.stage}</dd>
+        </div>
+        <div>
+          <dt>Events</dt>
+          <dd>{props.eventCount}</dd>
+        </div>
+        <div>
+          <dt>Errors</dt>
+          <dd>{props.errorCount}</dd>
+        </div>
+      </dl>
+      <Show when={props.task.kind === "orchestration"}>
+        <div class="context-note">Coordinator owns global context; sub-agents work in isolated execution shards.</div>
+      </Show>
+    </section>
   )
 }
 
@@ -1473,17 +1541,24 @@ function TaskChainNav(props: {
       <div class="chain-meter">
         <div style={{ width: `${percent()}%` }} />
       </div>
-      <div class="chain-steps">
+      <div class="chain-canvas">
+        <div class="canvas-grid" aria-hidden="true" />
         <For each={props.tasks}>
           {(task, index) => (
             <button
-              class="chain-step"
-              classList={{ active: task.id === props.currentTaskId }}
+              class="chain-node"
+              classList={{
+                active: task.id === props.currentTaskId,
+                completed: task.status === "completed",
+                failed: task.status === "failed",
+              }}
               onClick={() => props.onSelectTask(task.id)}
             >
               <span class={`chain-index ${task.status}`}>{index() + 1}</span>
-              <AgentAvatar data={props.data} agent={task.agent} compact />
-              <div>
+              <div class="node-icon">
+                <AgentAvatar data={props.data} agent={task.agent} compact />
+              </div>
+              <div class="node-label">
                 <strong>
                   {task.kind === "orchestration"
                     ? "Coordinator"
