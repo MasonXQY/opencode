@@ -5,6 +5,7 @@ import type {
   CreateOrchestrationPayload,
   CreateProjectPayload,
   CreateTaskPayload,
+  FileAttachment,
   Project,
   ShareTaskPayload,
   Task,
@@ -27,7 +28,9 @@ export class ApiClient {
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const headers = new Headers(init.headers)
     if (this.token) headers.set("Authorization", `Bearer ${this.token}`)
-    if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json")
+    if (init.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/json")
+    }
     const response = await fetch(path, { ...init, headers })
     if (!response.ok) {
       const text = await response.text()
@@ -72,14 +75,54 @@ export class ApiClient {
     })
   }
 
-  createTask(payload: CreateTaskPayload) {
+  uploadProjectFiles(projectId: string, files: File[]) {
+    const body = new FormData()
+    for (const file of files) body.append("files", file)
+    return this.request<{ files: FileAttachment[] }>(`/api/projects/${projectId}/files`, {
+      method: "POST",
+      body,
+    })
+  }
+
+  projectFileUrl(projectId: string, fileId: string) {
+    const suffix = this.token ? `?token=${encodeURIComponent(this.token)}` : ""
+    return `/api/projects/${encodeURIComponent(projectId)}/files/${encodeURIComponent(fileId)}${suffix}`
+  }
+
+  taskFiles(taskId: string) {
+    return this.request<FileAttachment[]>(`/api/tasks/${taskId}/files`)
+  }
+
+  createTask(payload: CreateTaskPayload & { files?: File[] }) {
+    if (payload.files?.length) {
+      const body = new FormData()
+      body.set("projectId", payload.projectId)
+      body.set("title", payload.title)
+      body.set("prompt", payload.prompt)
+      body.set("agent", payload.agent)
+      body.set("model", payload.model)
+      body.set("collaboration", payload.collaboration)
+      for (const file of payload.files) body.append("files", file)
+      return this.request<Task>("/api/tasks", { method: "POST", body })
+    }
     return this.request<Task>("/api/tasks", {
       method: "POST",
       body: JSON.stringify(payload),
     })
   }
 
-  createOrchestration(payload: CreateOrchestrationPayload) {
+  createOrchestration(payload: CreateOrchestrationPayload & { files?: File[] }) {
+    if (payload.files?.length) {
+      const body = new FormData()
+      body.set("projectId", payload.projectId)
+      body.set("title", payload.title)
+      body.set("prompt", payload.prompt)
+      body.set("model", payload.model)
+      body.set("collaboration", payload.collaboration)
+      body.set("scale", payload.scale ?? "balanced")
+      for (const file of payload.files) body.append("files", file)
+      return this.request<Task>("/api/orchestrations", { method: "POST", body })
+    }
     return this.request<Task>("/api/orchestrations", {
       method: "POST",
       body: JSON.stringify(payload),

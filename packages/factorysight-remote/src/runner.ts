@@ -2,6 +2,7 @@ import path from "node:path"
 import { spawn } from "node:child_process"
 import { appendEvent, getState, patchTask, setTaskStatus } from "./store"
 import type { Task } from "./shared"
+import { listProjectFiles } from "./file-storage"
 
 const running = new Set<string>()
 
@@ -84,6 +85,15 @@ async function appendDeliverable(task: Task, projectPath: string, exitCode: numb
   })
 }
 
+async function attachedFileContext(task: Task, projectPath: string) {
+  const files = (await listProjectFiles(projectPath)).filter(
+    (file) => file.scope === "project" || file.taskId === task.id || file.taskId === task.parentTaskId,
+  )
+  if (files.length === 0) return task.prompt
+  const fileList = files.map((file) => `- ${file.relativePath} (${file.originalName})`).join("\n")
+  return `${task.prompt}\n\nAttached files available in the workspace:\n${fileList}`
+}
+
 async function appendOutput(taskId: string, type: "runner" | "error", chunk: Uint8Array | undefined) {
   if (!chunk?.length) return
   const text = decoder().decode(chunk).trim()
@@ -120,11 +130,12 @@ export async function runTask(taskId: string) {
     const bin = binaryPath()
     await setTaskStatus(taskId, "running", `Runner started with ${task.agent} on ${task.model}`)
     await appendEvent(taskId, { type: "runner", text: `Workspace: ${project.path}` })
+    const prompt = await attachedFileContext(task, project.path)
 
     const args = [
         bin,
         "run",
-        task.prompt,
+        prompt,
         "--format",
         "json",
         "--agent",

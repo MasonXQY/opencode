@@ -1973,7 +1973,8 @@ h3 {
 .runner-preview,
 .agent-results,
 .deliverables-list,
-.artifact-list {
+.artifact-list,
+.file-list {
   display: grid;
   gap: 10px;
 }
@@ -2005,6 +2006,89 @@ h3 {
   color: var(--presight-color-gray-800);
   text-align: left;
   box-shadow: none;
+}
+
+.file-upload {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.file-picker {
+  min-width: 0;
+  display: grid;
+  align-content: center;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px dashed var(--presight-color-gray-300);
+  border-radius: var(--presight-radius-md);
+  background: var(--factory-surface);
+  color: var(--presight-color-gray-700);
+  cursor: pointer;
+}
+
+.file-picker input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.selected-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.selected-files span {
+  padding: 4px 8px;
+  border: 1px solid var(--presight-color-gray-200);
+  border-radius: 999px;
+  color: var(--presight-color-gray-600);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.file-link {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--presight-color-gray-200);
+  border-radius: var(--presight-radius-md);
+  background: var(--factory-surface);
+  color: var(--presight-color-gray-800);
+  text-align: left;
+  box-shadow: none;
+}
+
+.file-link > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.file-link strong,
+.file-link small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-link small {
+  color: var(--presight-color-gray-500);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.file-link b {
+  color: var(--presight-color-gray-500);
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .artifact-link > span {
@@ -2220,6 +2304,9 @@ h3 {
 :root[data-theme="linear"] .manager-controls,
 :root[data-theme="linear"] .workspace-summary span,
 :root[data-theme="linear"] .artifact-link,
+:root[data-theme="linear"] .file-link,
+:root[data-theme="linear"] .file-picker,
+:root[data-theme="linear"] .selected-files span,
 :root[data-theme="linear"] .result-metric,
 :root[data-theme="linear"] .result-summary pre,
 :root[data-theme="linear"] .result-errors pre,
@@ -2315,6 +2402,8 @@ h3 {
 :root[data-theme="linear"] .result-metric span,
 :root[data-theme="linear"] .result-empty,
 :root[data-theme="linear"] .artifact-link small,
+:root[data-theme="linear"] .file-link small,
+:root[data-theme="linear"] .file-link b,
 :root[data-theme="linear"] .chain-step small,
 :root[data-theme="linear"] .manager-confirm p,
 :root[data-theme="linear"] .manager-projects small,
@@ -2328,6 +2417,7 @@ h3 {
 :root[data-theme="linear"] .result-metric strong,
 :root[data-theme="linear"] .agent-identity strong,
 :root[data-theme="linear"] .artifact-link strong,
+:root[data-theme="linear"] .file-link strong,
 :root[data-theme="linear"] .workspace-summary strong {
   color: var(--presight-color-gray-900);
 }

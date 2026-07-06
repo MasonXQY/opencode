@@ -5,6 +5,7 @@ import type { Accessor } from "solid-js"
 import {
   preferredDefaultModel,
   type BootstrapData,
+  type FileAttachment,
   type PermissionLevel,
   type Project,
   type Task,
@@ -145,6 +146,12 @@ function artifactUrl(projectId: string, relativePath: string, token: string | un
   const encoded = relativePath.split("/").map(encodeURIComponent).join("/")
   const suffix = token ? `?token=${encodeURIComponent(token)}` : ""
   return `/api/projects/${encodeURIComponent(projectId)}/artifacts/${encoded}${suffix}`
+}
+
+function formatBytes(size: number) {
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  return `${(size / 1024 / 1024).toFixed(1)} MB`
 }
 
 function progressValue(tasks: Task[]) {
@@ -399,6 +406,12 @@ function Workspace(props: {
               props.onSelectTask(undefined)
               await props.onRefresh()
             }}
+          />
+          <ProjectFilesPanel
+            project={activeProject()}
+            files={props.data.files.filter((file) => file.projectId === activeProject()?.id && file.scope === "project")}
+            api={props.api}
+            onChanged={props.onRefresh}
           />
           <TaskList data={props.data} tasks={projectTasks()} selected={props.selectedTaskId} onSelect={props.onSelectTask} />
           <TaskForm
@@ -844,6 +857,61 @@ function ProjectForm(props: { data: BootstrapData; api: ApiClient; onCreated: (p
   )
 }
 
+function ProjectFilesPanel(props: {
+  project: Project | undefined
+  files: FileAttachment[]
+  api: ApiClient
+  onChanged: () => void
+}) {
+  const [busy, setBusy] = createSignal(false)
+  const [selectedFiles, setSelectedFiles] = createSignal<File[]>([])
+
+  return (
+    <section class="panel file-panel">
+      <div class="panel-heading">
+        <h2>Files</h2>
+        <span>{props.files.length} project</span>
+      </div>
+      <p class="panel-intro">Stored in this project's `.factorysight` folder.</p>
+      <form
+        class="file-upload"
+        onSubmit={async (event) => {
+          event.preventDefault()
+          if (!props.project || selectedFiles().length === 0) return
+          setBusy(true)
+          await props.api.uploadProjectFiles(props.project.id, selectedFiles())
+          setSelectedFiles([])
+          setBusy(false)
+          props.onChanged()
+        }}
+      >
+        <label class="file-picker">
+          <span>{selectedFiles().length ? `${selectedFiles().length} selected` : "Upload project files"}</span>
+          <input type="file" multiple onChange={(event) => setSelectedFiles(Array.from(event.currentTarget.files ?? []))} />
+        </label>
+        <button disabled={busy() || !props.project || selectedFiles().length === 0}>
+          {busy() ? "Uploading..." : "Upload"}
+        </button>
+      </form>
+      <Show when={props.files.length > 0}>
+        <div class="file-list">
+          <For each={props.files}>
+            {(file) => (
+              <button type="button" class="file-link" onClick={() => (window.location.href = props.api.projectFileUrl(file.projectId, file.id))}>
+                <span>
+                  <strong>{file.originalName}</strong>
+                  <small>{file.relativePath}</small>
+                </span>
+                <b>{formatBytes(file.size)}</b>
+              </button>
+            )}
+          </For>
+        </div>
+      </Show>
+    </section>
+  )
+}
+
 function TaskForm(props: { data: BootstrapData; api: ApiClient; activeProjectId: string | undefined; onCreated: () => void }) {
   const [mode, setMode] = createSignal<"single" | "team">("team")
   const [scale, setScale] = createSignal<"focused" | "balanced" | "wide">("balanced")
@@ -858,6 +926,7 @@ function TaskForm(props: { data: BootstrapData; api: ApiClient; activeProjectId:
   const [collaboration, setCollaboration] = createSignal<"private" | "project" | "shared">("project")
   const [productStyle, setProductStyle] = createSignal<ProductStyleId>("operational")
   const [styleNotes, setStyleNotes] = createSignal("")
+  const [files, setFiles] = createSignal<File[]>([])
   const [busy, setBusy] = createSignal(false)
   const filteredModels = createMemo(() => {
     const query = modelQuery().trim().toLowerCase()
@@ -895,6 +964,7 @@ function TaskForm(props: { data: BootstrapData; api: ApiClient; activeProjectId:
               model: model(),
               collaboration: collaboration(),
               scale: scale(),
+              files: files(),
             })
           } else {
             await props.api.createTask({
@@ -904,12 +974,14 @@ function TaskForm(props: { data: BootstrapData; api: ApiClient; activeProjectId:
               agent: agent(),
               model: model(),
               collaboration: collaboration(),
+              files: files(),
             })
           }
           setBusy(false)
           setTitle("")
           setPrompt("")
           setStyleNotes("")
+          setFiles([])
           props.onCreated()
         }}
         >
@@ -937,6 +1009,21 @@ function TaskForm(props: { data: BootstrapData; api: ApiClient; activeProjectId:
           />
         </label>
         <p class="field-hint">Write the success condition first; constraints and references can follow.</p>
+        <label class="file-picker">
+          <span>{files().length ? `${files().length} attached` : "Attach task files"}</span>
+          <input type="file" multiple onChange={(event) => setFiles(Array.from(event.currentTarget.files ?? []))} />
+        </label>
+        <Show when={files().length > 0}>
+          <div class="selected-files">
+            <For each={files()}>
+              {(file) => (
+                <span>
+                  {file.name} · {formatBytes(file.size)}
+                </span>
+              )}
+            </For>
+          </div>
+        </Show>
         <button disabled={busy() || !projectId() || !prompt()}>
           {busy() ? "Launching..." : mode() === "team" ? "Launch swarm" : "Queue task"}
         </button>
@@ -1314,6 +1401,7 @@ function ResultPanel(props: {
   const projectArtifacts = createMemo(() =>
     props.data.artifacts.filter((artifact) => artifact.projectId === props.task.projectId),
   )
+  const taskFiles = createMemo(() => props.data.files.filter((file) => file.taskId === props.task.id))
 
   return (
     <section class="result-panel">
@@ -1357,6 +1445,26 @@ function ResultPanel(props: {
                   <small>{artifact.relativePath}</small>
                 </span>
                 <b>Open</b>
+              </button>
+            )}
+          </For>
+        </div>
+      </Show>
+
+      <Show when={taskFiles().length > 0}>
+        <div class="file-list">
+          <div class="section-heading">
+            <h2>Task files</h2>
+            <span>{taskFiles().length} attached</span>
+          </div>
+          <For each={taskFiles()}>
+            {(file) => (
+              <button type="button" class="file-link" onClick={() => (window.location.href = props.api.projectFileUrl(file.projectId, file.id))}>
+                <span>
+                  <strong>{file.originalName}</strong>
+                  <small>{file.relativePath}</small>
+                </span>
+                <b>{formatBytes(file.size)}</b>
               </button>
             )}
           </For>

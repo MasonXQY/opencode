@@ -41,6 +41,20 @@ export type Artifact = {
   relativePath: string
 }
 
+export type FileAttachment = {
+  id: string
+  projectId: string
+  taskId?: string
+  scope: "project" | "task"
+  name: string
+  originalName: string
+  relativePath: string
+  size: number
+  type: string
+  uploadedBy: string
+  createdAt: string
+}
+
 export type Task = {
   id: string
   projectId: string
@@ -59,6 +73,7 @@ export type Task = {
   updatedAt: string
   sessionId?: string
   runnerPid?: number
+  fileIds?: string[]
   events: TaskEvent[]
 }
 
@@ -73,6 +88,7 @@ export type AppState = {
   sessions: Session[]
   projects: Project[]
   tasks: Task[]
+  files?: FileAttachment[]
 }
 
 export type AuthPayload = {
@@ -133,6 +149,7 @@ export type BootstrapData = {
   projects: Project[]
   tasks: Task[]
   artifacts: Artifact[]
+  files: FileAttachment[]
   agents: string[]
   agentProfiles: Record<string, AgentProfile>
   models: string[]

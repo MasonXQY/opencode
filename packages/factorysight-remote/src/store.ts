@@ -2,6 +2,7 @@ import path from "node:path"
 import { randomUUID } from "node:crypto"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { defaultPermissionLevel, type AppState, type PermissionLevel, type Project, type Role, type Task, type TaskEvent, type TaskStatus, type User } from "./shared"
+import { createProjectFolders, deleteTaskFiles } from "./file-storage"
 
 const defaultDataDir = path.join(process.env.HOME ?? process.cwd(), ".factorysight-remote")
 const dataDir = process.env.FACTORYSIGHT_REMOTE_DATA ?? defaultDataDir
@@ -40,6 +41,7 @@ async function ensureLoaded() {
     sessions: [],
     projects: [],
     tasks: [],
+    files: [],
   }
   await save()
   return state
@@ -100,10 +102,12 @@ export async function createProject(input: {
   collaboratorIds?: string[]
 }) {
   const state = await ensureLoaded()
+  const projectPath = input.path.trim() || process.cwd()
+  await createProjectFolders(projectPath)
   const project: Project = {
     id: id("prj"),
     name: input.name.trim() || "Untitled project",
-    path: input.path.trim() || process.cwd(),
+    path: projectPath,
     permissionLevel: input.permissionLevel ?? defaultPermissionLevel,
     createdAt: now(),
     memberships: {
@@ -195,7 +199,7 @@ export async function setTaskStatus(taskId: string, status: TaskStatus, text?: s
 
 export async function patchTask(
   taskId: string,
-  patch: Partial<Pick<Task, "runnerPid" | "sessionId" | "childTaskIds">>,
+  patch: Partial<Pick<Task, "runnerPid" | "sessionId" | "childTaskIds" | "fileIds">>,
 ) {
   const state = await ensureLoaded()
   const task = state.tasks.find((item) => item.id === taskId)
@@ -285,6 +289,7 @@ export async function deleteTask(taskId: string, userId: string) {
         : item,
     )
   for (const deletedId of deletedIds) subscribers.delete(deletedId)
+  if (project) await deleteTaskFiles(project.path, [...deletedIds])
   await save()
   return { deletedTaskIds: [...deletedIds] }
 }

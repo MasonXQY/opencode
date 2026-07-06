@@ -25,6 +25,7 @@ import {
 import { enqueueTask } from "./runner"
 import { agentProfiles, defaultAgents, permissionProfiles, type Artifact, type Project, type Task, type User } from "./shared"
 import { availableModels } from "./models"
+import { listProjectFiles, saveUploadedFile } from "./file-storage"
 
 export const app = new Hono<{ Variables: { user: User } }>()
 const sourceDir = typeof import.meta.dirname === "string" ? import.meta.dirname : path.dirname(new URL(import.meta.url).pathname)
@@ -64,6 +65,11 @@ const shareTaskSchema = z.object({
   userId: z.string().min(1),
   role: z.enum(["owner", "collaborator", "reviewer", "viewer"]).default("collaborator"),
 })
+const maxUploadBytes = 25 * 1024 * 1024
+type FormLike = {
+  get(key: string): unknown
+  getAll(key: string): unknown[]
+}
 
 function tokenFromHeader(header: string | undefined) {
   if (!header) return
@@ -102,6 +108,91 @@ app.use("/api/permissions", requireUser)
 app.use("/api/tasks", requireUser)
 app.use("/api/tasks/*", requireUser)
 app.use("/api/orchestrations", requireUser)
+
+function isMultipart(c: any) {
+  return c.req.header("content-type")?.toLowerCase().includes("multipart/form-data")
+}
+
+function formString(form: FormLike, key: string, fallback = "") {
+  const value = form.get(key)
+  return typeof value === "string" ? value : fallback
+}
+
+function formFiles(form: FormLike) {
+  return [...form.getAll("files"), ...form.getAll("attachments")].filter(
+    (value): value is File => value instanceof File && value.size > 0,
+  )
+}
+
+function assertUploadLimits(files: File[]) {
+  for (const file of files) {
+    if (file.size > maxUploadBytes) throw new Error(`${file.name} is larger than 25MB`)
+  }
+}
+
+async function visibleProject(projectId: string, userId: string) {
+  return (await visibleProjects(userId)).find((item) => item.id === projectId)
+}
+
+async function parseCreateTask(c: any) {
+  if (!isMultipart(c)) return { body: createTaskSchema.parse(await c.req.json()), files: [] as File[] }
+  const form = await c.req.raw.formData()
+  const files = formFiles(form)
+  assertUploadLimits(files)
+  return {
+    body: createTaskSchema.parse({
+      projectId: formString(form, "projectId"),
+      title: formString(form, "title"),
+      prompt: formString(form, "prompt"),
+      agent: formString(form, "agent"),
+      model: formString(form, "model"),
+      collaboration: formString(form, "collaboration", "project"),
+    }),
+    files,
+  }
+}
+
+async function parseCreateOrchestration(c: any) {
+  if (!isMultipart(c)) return { body: createOrchestrationSchema.parse(await c.req.json()), files: [] as File[] }
+  const form = await c.req.raw.formData()
+  const files = formFiles(form)
+  assertUploadLimits(files)
+  return {
+    body: createOrchestrationSchema.parse({
+      projectId: formString(form, "projectId"),
+      title: formString(form, "title"),
+      prompt: formString(form, "prompt"),
+      model: formString(form, "model"),
+      collaboration: formString(form, "collaboration", "project"),
+      scale: formString(form, "scale", "balanced"),
+    }),
+    files,
+  }
+}
+
+async function attachFiles(project: Project, task: Task, files: File[], userId: string) {
+  if (files.length === 0) return task
+  const saved = await Promise.all(
+    files.map((file) =>
+      saveUploadedFile({
+        projectId: project.id,
+        projectPath: project.path,
+        taskId: task.id,
+        scope: "task",
+        uploadedBy: userId,
+        file,
+      }),
+    ),
+  )
+  await patchTask(task.id, { fileIds: saved.map((file) => file.id) })
+  await appendEvent(task.id, {
+    type: "system",
+    text: `Attached ${saved.length} file${saved.length === 1 ? "" : "s"}:\n${saved
+      .map((file) => `- ${file.relativePath}`)
+      .join("\n")}`,
+  })
+  return { ...task, fileIds: saved.map((file) => file.id) }
+}
 
 function orchestrationPlan(prompt: string, scale: "focused" | "balanced" | "wide") {
   const normalized = prompt.toLowerCase()
@@ -260,6 +351,7 @@ app.get("/api/app/bootstrap", async (c) => {
     projects: await visibleProjects(user.id),
     tasks: await visibleTasks(user.id),
     artifacts: await visibleArtifacts(user.id),
+    files: (await Promise.all((await visibleProjects(user.id)).map((project) => listProjectFiles(project.path)))).flat(),
     agents: defaultAgents,
     agentProfiles,
     models: await availableModels(),
@@ -296,6 +388,44 @@ app.get("/api/projects/:projectId/artifacts/*", async (c) => {
 
 app.get("/api/projects", async (c) => {
   return c.json(await visibleProjects(c.get("user").id))
+})
+
+app.get("/api/projects/:projectId/files", async (c) => {
+  const project = await visibleProject(c.req.param("projectId"), c.get("user").id)
+  if (!project) return c.json({ error: "project not found" }, 404)
+  return c.json(await listProjectFiles(project.path))
+})
+
+app.post("/api/projects/:projectId/files", async (c) => {
+  const user = c.get("user")
+  const project = await visibleProject(c.req.param("projectId"), user.id)
+  if (!project) return c.json({ error: "project not found" }, 404)
+  const form = await c.req.raw.formData()
+  const files = formFiles(form)
+  assertUploadLimits(files)
+  const saved = await Promise.all(
+    files.map((file) =>
+      saveUploadedFile({
+        projectId: project.id,
+        projectPath: project.path,
+        scope: "project",
+        uploadedBy: user.id,
+        file,
+      }),
+    ),
+  )
+  return c.json({ files: saved })
+})
+
+app.get("/api/projects/:projectId/files/:fileId", async (c) => {
+  const project = await visibleProject(c.req.param("projectId"), c.get("user").id)
+  if (!project) return c.json({ error: "project not found" }, 404)
+  const file = (await listProjectFiles(project.path)).find((item) => item.id === c.req.param("fileId"))
+  if (!file) return c.json({ error: "file not found" }, 404)
+  const uploadRoot = path.resolve(project.path, ".factorysight", "uploads")
+  const requested = path.resolve(project.path, file.relativePath)
+  if (!requested.startsWith(uploadRoot)) return c.json({ error: "file path not allowed" }, 403)
+  return new Response(await readFile(requested), { headers: { "Content-Type": contentType(requested) } })
 })
 
 app.get("/api/permissions", async (c) => {
@@ -365,21 +495,22 @@ app.get("/api/tasks", async (c) => {
 
 app.post("/api/tasks", async (c) => {
   const user = c.get("user")
-  const body = createTaskSchema.parse(await c.req.json())
-  const project = (await visibleProjects(user.id)).find((item) => item.id === body.projectId)
+  const { body, files } = await parseCreateTask(c)
+  const project = await visibleProject(body.projectId, user.id)
   if (!project) return c.json({ error: "project not found" }, 404)
-  const task = await createTask({ ...body, creatorId: user.id })
+  let task = await createTask({ ...body, creatorId: user.id })
+  task = await attachFiles(project, task, files, user.id)
   enqueueTask(task)
   return c.json(task)
 })
 
 app.post("/api/orchestrations", async (c) => {
   const user = c.get("user")
-  const body = createOrchestrationSchema.parse(await c.req.json())
-  const project = (await visibleProjects(user.id)).find((item) => item.id === body.projectId)
+  const { body, files } = await parseCreateOrchestration(c)
+  const project = await visibleProject(body.projectId, user.id)
   if (!project) return c.json({ error: "project not found" }, 404)
 
-  const parent = await createTask({
+  let parent = await createTask({
     creatorId: user.id,
     projectId: body.projectId,
     title: body.title || body.prompt.slice(0, 80),
@@ -389,6 +520,7 @@ app.post("/api/orchestrations", async (c) => {
     collaboration: body.collaboration,
     kind: "orchestration",
   })
+  parent = await attachFiles(project, parent, files, user.id)
   await appendEvent(parent.id, {
     type: "system",
     text: `Autonomous Agent Swarm started in ${body.scale} mode.`,
@@ -422,6 +554,15 @@ app.post("/api/orchestrations", async (c) => {
   })
   await setTaskStatus(parent.id, "completed", "Sub-agent tasks dispatched")
   return c.json({ ...parent, childTaskIds: children.map((child) => child.id) })
+})
+
+app.get("/api/tasks/:taskId/files", async (c) => {
+  const user = c.get("user")
+  const task = await getVisibleTask(c.req.param("taskId"), user.id)
+  if (!task) return c.json({ error: "task not found" }, 404)
+  const project = await visibleProject(task.projectId, user.id)
+  if (!project) return c.json({ error: "project not found" }, 404)
+  return c.json((await listProjectFiles(project.path)).filter((file) => file.taskId === task.id))
 })
 
 app.get("/api/tasks/:taskId", async (c) => {
