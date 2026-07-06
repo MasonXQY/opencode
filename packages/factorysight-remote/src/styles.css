@@ -66,6 +66,120 @@
   --factory-surface-muted: rgb(246 248 250 / 0.92);
 }
 
+:root[data-theme="linear"] {
+  color-scheme: dark;
+  --presight-color-blue-25: #111325;
+  --presight-color-blue-50: #171a35;
+  --presight-color-blue-100: #20244a;
+  --presight-color-blue-200: #343a73;
+  --presight-color-blue-500: #5e6ad2;
+  --presight-color-blue-600: #6f7cff;
+  --presight-color-blue-700: #9aa3ff;
+  --presight-color-blue-900: #eef0ff;
+  --presight-color-cyan-500: #828fff;
+  --presight-color-teal-500: #27a644;
+  --presight-color-gray-25: #141516;
+  --presight-color-gray-50: #18191a;
+  --presight-color-gray-100: #191a1b;
+  --presight-color-gray-200: #23252a;
+  --presight-color-gray-300: #34343a;
+  --presight-color-gray-400: #62666d;
+  --presight-color-gray-500: #8a8f98;
+  --presight-color-gray-600: #d0d6e0;
+  --presight-color-gray-700: #e4e8ef;
+  --presight-color-gray-800: #f1f3f5;
+  --presight-color-gray-900: #f7f8f8;
+  --presight-color-success-50: #0f2215;
+  --presight-color-success-700: #47c869;
+  --presight-color-warning-50: #251b0a;
+  --presight-color-warning-700: #f4b95e;
+  --presight-color-error-50: #2a1115;
+  --presight-color-error-700: #ff7b8b;
+  --presight-shadow-xs: none;
+  --presight-shadow-s: none;
+  --presight-shadow-m: none;
+  --presight-shadow-input: 0 0 0 3px rgb(94 106 210 / 0.28);
+  --factory-bg: #010102;
+  --factory-surface: #0f1011;
+  --factory-canvas: #010102;
+  --factory-surface-muted: #08090b;
+  --factory-topbar: #010102;
+  --factory-border: #23252a;
+}
+
+:root[data-theme="vercel"] {
+  --presight-color-blue-500: #000000;
+  --presight-color-blue-600: #111111;
+  --presight-color-blue-700: #000000;
+  --presight-color-blue-900: #000000;
+  --factory-bg: #f5f5f5;
+  --factory-canvas: #fafafa;
+  --factory-surface-muted: #f4f4f4;
+}
+
+:root[data-theme="notion"] {
+  --presight-color-blue-25: #fbf7ef;
+  --presight-color-blue-50: #f6efe4;
+  --presight-color-blue-500: #9b6a43;
+  --presight-color-blue-600: #7b5234;
+  --presight-color-blue-700: #5c3d28;
+  --factory-bg: #f5f1ea;
+  --factory-canvas: #fbfaf7;
+  --factory-surface-muted: #f3eee6;
+}
+
+:root[data-theme="raycast"] {
+  color-scheme: dark;
+  --presight-color-blue-25: #1d1113;
+  --presight-color-blue-50: #2a1519;
+  --presight-color-blue-500: #ff6363;
+  --presight-color-blue-600: #ff4f4f;
+  --presight-color-blue-700: #ff8c8c;
+  --presight-color-blue-900: #fff3f3;
+  --presight-color-cyan-500: #ff8c8c;
+  --presight-color-gray-25: #161618;
+  --presight-color-gray-50: #1b1b1e;
+  --presight-color-gray-100: #222227;
+  --presight-color-gray-200: #303038;
+  --presight-color-gray-300: #484854;
+  --presight-color-gray-500: #a1a1aa;
+  --presight-color-gray-600: #c9c9d1;
+  --presight-color-gray-700: #e1e1e8;
+  --presight-color-gray-800: #f0f0f5;
+  --presight-color-gray-900: #ffffff;
+  --factory-bg: #0d0d10;
+  --factory-surface: #161618;
+  --factory-canvas: #0d0d10;
+  --factory-surface-muted: #121215;
+  --factory-topbar: #0d0d10;
+}
+
+:root[data-theme="supabase"] {
+  color-scheme: dark;
+  --presight-color-blue-25: #071811;
+  --presight-color-blue-50: #0b2218;
+  --presight-color-blue-500: #3ecf8e;
+  --presight-color-blue-600: #3ecf8e;
+  --presight-color-blue-700: #72e4b2;
+  --presight-color-blue-900: #e6fff4;
+  --presight-color-cyan-500: #72e4b2;
+  --presight-color-gray-25: #111615;
+  --presight-color-gray-50: #151b1a;
+  --presight-color-gray-100: #1c2422;
+  --presight-color-gray-200: #26312f;
+  --presight-color-gray-300: #3a4744;
+  --presight-color-gray-500: #97a6a1;
+  --presight-color-gray-600: #c4d0cc;
+  --presight-color-gray-700: #dbe5e1;
+  --presight-color-gray-800: #edf5f2;
+  --presight-color-gray-900: #f8fffc;
+  --factory-bg: #0b0f0e;
+  --factory-surface: #111615;
+  --factory-canvas: #0b0f0e;
+  --factory-surface-muted: #0e1312;
+  --factory-topbar: #0b0f0e;
+}
+
 :root[data-theme="terminal"] {
   color-scheme: dark;
   --presight-color-blue-25: #0e1716;
@@ -123,6 +237,89 @@ body {
   background:
     linear-gradient(180deg, rgb(255 255 255 / 0.56), transparent 220px),
     var(--factory-bg);
+}
+
+:root[data-theme="linear"] body,
+:root[data-theme="raycast"] body,
+:root[data-theme="supabase"] body,
+:root[data-theme="terminal"] body {
+  background: var(--factory-bg);
+}
+
+:root[data-theme="linear"] .app-shell,
+:root[data-theme="linear"] .topbar,
+:root[data-theme="linear"] .detail,
+:root[data-theme="linear"] .detail-header,
+:root[data-theme="linear"] .workspace-summary span,
+:root[data-theme="linear"] .permission-button,
+:root[data-theme="linear"] .design-button,
+:root[data-theme="linear"] .project-picker button.active,
+:root[data-theme="linear"] .task-card.active,
+:root[data-theme="linear"] .task-card:hover,
+:root[data-theme="linear"] .chain-step.active,
+:root[data-theme="linear"] .artifact-link,
+:root[data-theme="linear"] .result-summary pre,
+:root[data-theme="linear"] .result-errors pre,
+:root[data-theme="linear"] .runner-preview pre,
+:root[data-theme="linear"] .deliverable-card pre,
+:root[data-theme="linear"] .event pre {
+  background: var(--factory-surface);
+}
+
+:root[data-theme="linear"] .sidebar {
+  background: linear-gradient(180deg, #08090b, var(--factory-surface-muted));
+}
+
+:root[data-theme="linear"] .app-shell,
+:root[data-theme="linear"] .topbar,
+:root[data-theme="linear"] .panel,
+:root[data-theme="linear"] .result-panel,
+:root[data-theme="linear"] .agent-stage,
+:root[data-theme="linear"] .linked-tasks,
+:root[data-theme="linear"] .swarm-panel,
+:root[data-theme="linear"] .timeline,
+:root[data-theme="linear"] .event,
+:root[data-theme="linear"] .detail-header,
+:root[data-theme="linear"] .chain-nav,
+:root[data-theme="linear"] .permission-button,
+:root[data-theme="linear"] .artifact-link,
+:root[data-theme="linear"] input,
+:root[data-theme="linear"] textarea,
+:root[data-theme="linear"] select {
+  border-color: var(--presight-color-gray-200);
+}
+
+:root[data-theme="linear"] button {
+  border-color: var(--presight-color-blue-500);
+  background: var(--presight-color-blue-500);
+}
+
+:root[data-theme="linear"] button:hover {
+  border-color: var(--presight-color-blue-600);
+  background: var(--presight-color-blue-600);
+}
+
+:root[data-theme="linear"] button.ghost,
+:root[data-theme="linear"] .project-picker button,
+:root[data-theme="linear"] .task-card,
+:root[data-theme="linear"] .mode-cards button,
+:root[data-theme="linear"] .scale-row button,
+:root[data-theme="linear"] .swarm-agent,
+:root[data-theme="linear"] .agent-result,
+:root[data-theme="linear"] .deliverable-card,
+:root[data-theme="linear"] .linked-task,
+:root[data-theme="linear"] .permission-button,
+:root[data-theme="linear"] .design-button {
+  border-color: var(--presight-color-gray-200);
+  background: var(--factory-surface);
+  color: var(--presight-color-gray-800);
+}
+
+:root[data-theme="linear"] button.ghost:hover,
+:root[data-theme="linear"] .project-picker button:hover,
+:root[data-theme="linear"] .task-card:hover {
+  border-color: var(--presight-color-gray-300);
+  background: var(--presight-color-gray-50);
 }
 
 button,
@@ -508,6 +705,26 @@ h3 {
   border: 1px solid var(--presight-color-gray-200);
   border-radius: 999px;
   background: linear-gradient(135deg, var(--presight-color-blue-600), var(--presight-color-cyan-500));
+}
+
+.design-menu i[data-swatch="linear"] {
+  background: linear-gradient(135deg, #010102, #5e6ad2);
+}
+
+.design-menu i[data-swatch="vercel"] {
+  background: linear-gradient(135deg, #000000 48%, #ffffff 48%);
+}
+
+.design-menu i[data-swatch="notion"] {
+  background: linear-gradient(135deg, #f5f1ea, #9b6a43);
+}
+
+.design-menu i[data-swatch="raycast"] {
+  background: linear-gradient(135deg, #0d0d10, #ff6363);
+}
+
+.design-menu i[data-swatch="supabase"] {
+  background: linear-gradient(135deg, #0b0f0e, #3ecf8e);
 }
 
 .design-menu i[data-swatch="graphite"] {
@@ -1174,6 +1391,26 @@ h3 {
   border-radius: 999px;
   border: 1px solid var(--presight-color-gray-200);
   background: linear-gradient(135deg, var(--presight-color-blue-600), var(--presight-color-cyan-500));
+}
+
+.product-style-grid i[data-swatch="linear"] {
+  background: linear-gradient(135deg, #010102, #5e6ad2);
+}
+
+.product-style-grid i[data-swatch="vercel"] {
+  background: linear-gradient(135deg, #000000 48%, #ffffff 48%);
+}
+
+.product-style-grid i[data-swatch="notion"] {
+  background: linear-gradient(135deg, #f5f1ea, #9b6a43);
+}
+
+.product-style-grid i[data-swatch="raycast"] {
+  background: linear-gradient(135deg, #0d0d10, #ff6363);
+}
+
+.product-style-grid i[data-swatch="supabase"] {
+  background: linear-gradient(135deg, #0b0f0e, #3ecf8e);
 }
 
 .product-style-grid i[data-swatch="consumer"] {
@@ -1916,6 +2153,74 @@ h3 {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
+}
+
+:root[data-theme="linear"] button {
+  border-color: var(--presight-color-blue-500);
+  background: var(--presight-color-blue-500);
+  color: #ffffff;
+}
+
+:root[data-theme="linear"] button:hover {
+  border-color: var(--presight-color-blue-600);
+  background: var(--presight-color-blue-600);
+}
+
+:root[data-theme="linear"] button.ghost,
+:root[data-theme="linear"] .project-picker button,
+:root[data-theme="linear"] .task-card,
+:root[data-theme="linear"] .mode-cards button,
+:root[data-theme="linear"] .scale-row button,
+:root[data-theme="linear"] .swarm-agent,
+:root[data-theme="linear"] .agent-result,
+:root[data-theme="linear"] .deliverable-card,
+:root[data-theme="linear"] .linked-task,
+:root[data-theme="linear"] .permission-button,
+:root[data-theme="linear"] .design-button,
+:root[data-theme="linear"] .chain-step {
+  border-color: var(--presight-color-gray-200);
+  background: var(--factory-surface);
+  color: var(--presight-color-gray-800);
+}
+
+:root[data-theme="linear"] button.ghost:hover,
+:root[data-theme="linear"] .project-picker button:hover,
+:root[data-theme="linear"] .task-card:hover,
+:root[data-theme="linear"] .mode-cards button:hover,
+:root[data-theme="linear"] .scale-row button:hover,
+:root[data-theme="linear"] .chain-step:hover {
+  border-color: var(--presight-color-gray-300);
+  background: var(--presight-color-gray-50);
+}
+
+:root[data-theme="linear"] .project-picker button.active,
+:root[data-theme="linear"] .task-card.active,
+:root[data-theme="linear"] .mode-cards button.active,
+:root[data-theme="linear"] .scale-row button.active,
+:root[data-theme="linear"] .chain-step.active {
+  border-color: var(--presight-color-blue-500);
+  background: var(--presight-color-gray-50);
+  box-shadow: inset 3px 0 0 var(--presight-color-blue-500);
+}
+
+:root[data-theme="linear"] input,
+:root[data-theme="linear"] textarea,
+:root[data-theme="linear"] select {
+  border-color: var(--presight-color-gray-200);
+  background: var(--factory-surface);
+  color: var(--presight-color-gray-900);
+}
+
+:root[data-theme="linear"] .detail-header,
+:root[data-theme="linear"] .workspace-summary span,
+:root[data-theme="linear"] .artifact-link,
+:root[data-theme="linear"] .result-summary pre,
+:root[data-theme="linear"] .result-errors pre,
+:root[data-theme="linear"] .runner-preview pre,
+:root[data-theme="linear"] .deliverable-card pre,
+:root[data-theme="linear"] .event pre {
+  background: var(--factory-surface);
+  border-color: var(--presight-color-gray-200);
 }
 
 @media (max-width: 980px) {

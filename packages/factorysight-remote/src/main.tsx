@@ -14,10 +14,15 @@ import "./styles.css"
 
 const tokenKey = "factorysight.remote.token"
 const designThemeKey = "factorysight.remote.designTheme"
+const designThemeMigrationKey = "factorysight.remote.designTheme.awesomeDesignMd.v1"
 
 const designThemes = [
+  { id: "linear", name: "Linear", summary: "Dark, precise, lavender-accented product UI." },
+  { id: "vercel", name: "Vercel", summary: "Black-and-white precision with sharp contrast." },
+  { id: "notion", name: "Notion", summary: "Warm minimal workspace with soft surfaces." },
+  { id: "raycast", name: "Raycast", summary: "Sleek dark launcher with vivid accents." },
+  { id: "supabase", name: "Supabase", summary: "Dark developer console with emerald signal." },
   { id: "presight", name: "Presight", summary: "Bright operational workspace." },
-  { id: "graphite", name: "Graphite", summary: "Quiet neutral dashboard." },
   { id: "terminal", name: "Terminal", summary: "Dark command-center style." },
   { id: "contrast", name: "Contrast", summary: "Sharper borders and focus." },
 ] as const
@@ -25,6 +30,41 @@ const designThemes = [
 type DesignThemeId = (typeof designThemes)[number]["id"]
 
 const productStyles = [
+  {
+    id: "linear",
+    name: "Linear",
+    summary: "Precise, minimal, engineer-first product UI.",
+    guidance:
+      "Use a Linear-inspired style from awesome-design-md: ultra-minimal engineer workflow, dark or near-black surfaces when appropriate, lavender-blue accent only for focus and primary actions, hairline borders, dense structured issue/project views, no decorative cards.",
+  },
+  {
+    id: "vercel",
+    name: "Vercel",
+    summary: "Black-and-white technical precision.",
+    guidance:
+      "Use a Vercel-inspired style from awesome-design-md: stark black/white contrast, precise spacing, clean deployment/developer-product patterns, minimal ornament, strong typography, sharp component boundaries.",
+  },
+  {
+    id: "notion",
+    name: "Notion",
+    summary: "Warm document-workspace minimalism.",
+    guidance:
+      "Use a Notion-inspired style from awesome-design-md: warm minimal workspace, calm typography, soft neutral surfaces, database/document affordances, light hierarchy, approachable empty states.",
+  },
+  {
+    id: "raycast",
+    name: "Raycast",
+    summary: "Command palette speed and polish.",
+    guidance:
+      "Use a Raycast-inspired style from awesome-design-md: sleek command-center interactions, fast keyboard-first flows, dark chrome when useful, vivid but restrained accents, polished launcher-like panels.",
+  },
+  {
+    id: "supabase",
+    name: "Supabase",
+    summary: "Dark developer console, emerald accent.",
+    guidance:
+      "Use a Supabase-inspired style from awesome-design-md: developer-console density, dark panels, emerald accent for success and primary actions, code/data surfaces, clear auth/database affordances.",
+  },
   {
     id: "operational",
     name: "Operational SaaS",
@@ -61,7 +101,14 @@ type PendingDelete = { kind: "project"; project: Project } | { kind: "task"; tas
 
 function readDesignTheme(): DesignThemeId {
   const value = localStorage.getItem(designThemeKey)
-  return designThemes.some((theme) => theme.id === value) ? (value as DesignThemeId) : "presight"
+  const migrated = localStorage.getItem(designThemeMigrationKey)
+  if (!migrated) {
+    const next = !value || value === "presight" || value === "graphite" ? "linear" : value
+    localStorage.setItem(designThemeKey, next)
+    localStorage.setItem(designThemeMigrationKey, "1")
+    return designThemes.some((theme) => theme.id === next) ? (next as DesignThemeId) : "linear"
+  }
+  return designThemes.some((theme) => theme.id === value) ? (value as DesignThemeId) : "linear"
 }
 
 function statusLabel(status: Task["status"]) {
