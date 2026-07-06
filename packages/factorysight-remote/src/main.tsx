@@ -159,10 +159,11 @@ function buildProjectFlow(input: {
   fileUrl: (file: FileAttachment) => string
 }): ProjectFlow {
   const nodeWidth = 228
-  const nodeHeight = 172
-  const columnGap = 300
-  const rowGap = 206
-  const canvasPad = 96
+  const nodeHeight = 154
+  const columnGap = 290
+  const rowGap = 188
+  const canvasPad = 120
+  const maxRowsPerColumn = 3
   const inputX = 90
   const plannerX = inputX + columnGap
   const runs = (input.chainTasks.length ? input.chainTasks : input.tasks.slice(0, 8)).filter(
@@ -191,8 +192,8 @@ function buildProjectFlow(input: {
     }),
   )
   const children = runs.slice(1)
-  const childColumnCount = Math.max(1, Math.ceil(children.length / 4))
-  const rowsInLargestColumn = Math.max(1, Math.min(4, children.length || 1))
+  const childColumnCount = Math.max(1, Math.ceil(children.length / maxRowsPerColumn))
+  const rowsInLargestColumn = Math.max(1, Math.min(maxRowsPerColumn, children.length || 1))
   const graphHeight = Math.max(
     620,
     canvasPad * 2 + rowsInLargestColumn * nodeHeight + (rowsInLargestColumn - 1) * rowGap,
@@ -236,9 +237,9 @@ function buildProjectFlow(input: {
       agent: root.agent,
     })
     children.forEach((task, index) => {
-      const column = Math.floor(index / 4)
-      const row = index % 4
-      const rowsInColumn = Math.min(4, children.length - column * 4)
+      const column = Math.floor(index / maxRowsPerColumn)
+      const row = index % maxRowsPerColumn
+      const rowsInColumn = Math.min(maxRowsPerColumn, children.length - column * maxRowsPerColumn)
       const columnHeight = rowsInColumn * nodeHeight + (rowsInColumn - 1) * (rowGap - nodeHeight)
       const startY = Math.round(graphHeight / 2 - columnHeight / 2)
       nodes.push({
@@ -903,7 +904,6 @@ function ProjectFiles(props: {
 }) {
   const [files, setFiles] = createSignal<File[]>([])
   const [busy, setBusy] = createSignal(false)
-  const [configOpen, setConfigOpen] = createSignal(false)
   return (
     <Panel heading="Files" meta={`${props.files.length} project`}>
       <form
@@ -981,14 +981,21 @@ function WorkflowCanvas(props: {
         ?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" })
     })
   const fitCanvas = () => {
-    setZoom(flow().nodes.length > 7 ? 0.78 : 0.92)
-    requestAnimationFrame(() => nodeViewport?.scrollTo({ left: 0, behavior: "smooth" }))
-  }
-  const autoLayout = () => {
-    const nextZoom = flow().width > 1300 || flow().height > 720 ? 0.76 : 0.9
+    const nextZoom = flow().width > 1500 || flow().height > 740 ? 0.72 : 0.86
     setZoom(nextZoom)
     requestAnimationFrame(() => nodeViewport?.scrollTo({ left: 0, top: 0, behavior: "smooth" }))
   }
+  const autoLayout = () => {
+    const nextZoom = flow().width > 1500 || flow().height > 740 ? 0.72 : 0.86
+    setZoom(nextZoom)
+    requestAnimationFrame(() => nodeViewport?.scrollTo({ left: 0, top: 0, behavior: "smooth" }))
+  }
+
+  createEffect(() => {
+    const current = flow()
+    setZoom(current.width > 1500 || current.height > 740 ? 0.72 : 0.86)
+    requestAnimationFrame(() => nodeViewport?.scrollTo({ left: 0, top: 0 }))
+  })
 
   createEffect(() => {
     props.selectedTaskId
