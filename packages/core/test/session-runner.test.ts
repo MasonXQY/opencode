@@ -302,28 +302,22 @@ const testNode = LayerNode.group([
   SessionExecution.node,
   SessionV2.node,
 ])
-const makeTestLayer = (
-  discovery: typeof instructionContext | undefined,
-  execution: ReturnType<typeof makeExecution>,
-) =>
-  AppNodeBuilder.build(
-    testNode,
-    [
-      [LayerNodePlatform.llmClient, client],
-      [PermissionV2.node, permission],
-      [SessionRunnerModel.node, models],
-      [InstructionBuiltIns.node, systemContext],
-      ...(discovery ? [[InstructionDiscovery.node, discovery] as const] : []),
-      [Global.node, Global.layerWith({ config: "/nonexistent/opencode-test-config" })],
-      [Location.node, Location.boundNode({ directory: AbsolutePath.make("/project") })],
-      [SkillGuidance.node, skillGuidance],
-      [ReferenceGuidance.node, referenceGuidance],
-      [Snapshot.node, Snapshot.noopLayer],
-      [SessionExecution.node, execution],
-      [Config.node, config],
-      [ToolOutputStore.node, ToolOutputStore.nodeWithoutConfig],
-    ],
-  )
+const makeTestLayer = (discovery: typeof instructionContext | undefined, execution: ReturnType<typeof makeExecution>) =>
+  AppNodeBuilder.build(testNode, [
+    [LayerNodePlatform.llmClient, client],
+    [PermissionV2.node, permission],
+    [SessionRunnerModel.node, models],
+    [InstructionBuiltIns.node, systemContext],
+    ...(discovery ? [[InstructionDiscovery.node, discovery] as const] : []),
+    [Global.node, Global.layerWith({ config: "/nonexistent/opencode-test-config" })],
+    [Location.node, Location.boundNode({ directory: AbsolutePath.make("/project") })],
+    [SkillGuidance.node, skillGuidance],
+    [ReferenceGuidance.node, referenceGuidance],
+    [Snapshot.node, Snapshot.noopLayer],
+    [SessionExecution.node, execution],
+    [Config.node, config],
+    [ToolOutputStore.node, ToolOutputStore.nodeWithoutConfig],
+  ])
 const runnerLayer = makeRunnerLayer(instructionContext)
 const it = testEffect(makeTestLayer(instructionContext, makeExecution(runnerLayer)))
 const integrationIt = testEffect(makeTestLayer(undefined, makeExecution(makeRunnerLayer())))
@@ -901,13 +895,10 @@ describe("SessionRunnerLLM", () => {
           yield* session.prompt({ sessionID, prompt: Prompt.make({ text: "Second" }), resume: false })
           yield* session.resume(sessionID)
 
-          const update = `Instructions from: ${file}\nPersisted path-local instructions`
-          expect(requests[1]?.messages.map((message) => message.role)).toEqual([
-            "user",
-            "assistant",
-            "system",
-            "user",
-          ])
+          // Discovery records the path durably; observation re-reads content live,
+          // so the post-discovery edit is what the model gets told.
+          const update = `Instructions from: ${file}\nChanged after discovery`
+          expect(requests[1]?.messages.map((message) => message.role)).toEqual(["user", "assistant", "system", "user"])
           expect(requests[1]?.messages.at(2)?.content).toEqual([{ type: "text", text: update }])
           expect((yield* session.context(sessionID)).map((message) => message.type)).toEqual([
             "user",

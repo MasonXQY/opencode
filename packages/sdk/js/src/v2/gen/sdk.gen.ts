@@ -382,12 +382,12 @@ import type {
   V2SessionFormStateResponses,
   V2SessionGetErrors,
   V2SessionGetResponses,
-  V2SessionInstructionsListErrors,
-  V2SessionInstructionsListResponses,
-  V2SessionInstructionsPutErrors,
-  V2SessionInstructionsPutResponses,
-  V2SessionInstructionsRemoveErrors,
-  V2SessionInstructionsRemoveResponses,
+  V2SessionInstructionsEntryListErrors,
+  V2SessionInstructionsEntryListResponses,
+  V2SessionInstructionsEntryPutErrors,
+  V2SessionInstructionsEntryPutResponses,
+  V2SessionInstructionsEntryRemoveErrors,
+  V2SessionInstructionsEntryRemoveResponses,
   V2SessionInterruptErrors,
   V2SessionInterruptResponses,
   V2SessionListErrors,
@@ -5258,7 +5258,7 @@ export class Revert extends HeyApiClient {
   }
 }
 
-export class Instructions extends HeyApiClient {
+export class Entry extends HeyApiClient {
   /**
    * List instruction entries
    *
@@ -5272,11 +5272,11 @@ export class Instructions extends HeyApiClient {
   ) {
     const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "sessionID" }] }])
     return (options?.client ?? this.client).get<
-      V2SessionInstructionsListResponses,
-      V2SessionInstructionsListErrors,
+      V2SessionInstructionsEntryListResponses,
+      V2SessionInstructionsEntryListErrors,
       ThrowOnError
     >({
-      url: "/api/session/{sessionID}/instructions",
+      url: "/api/session/{sessionID}/instructions/entries",
       ...options,
       ...params,
     })
@@ -5306,11 +5306,11 @@ export class Instructions extends HeyApiClient {
       ],
     )
     return (options?.client ?? this.client).delete<
-      V2SessionInstructionsRemoveResponses,
-      V2SessionInstructionsRemoveErrors,
+      V2SessionInstructionsEntryRemoveResponses,
+      V2SessionInstructionsEntryRemoveErrors,
       ThrowOnError
     >({
-      url: "/api/session/{sessionID}/instructions/{key}",
+      url: "/api/session/{sessionID}/instructions/entries/{key}",
       ...options,
       ...params,
     })
@@ -5342,11 +5342,11 @@ export class Instructions extends HeyApiClient {
       ],
     )
     return (options?.client ?? this.client).put<
-      V2SessionInstructionsPutResponses,
-      V2SessionInstructionsPutErrors,
+      V2SessionInstructionsEntryPutResponses,
+      V2SessionInstructionsEntryPutErrors,
       ThrowOnError
     >({
-      url: "/api/session/{sessionID}/instructions/{key}",
+      url: "/api/session/{sessionID}/instructions/entries/{key}",
       ...options,
       ...params,
       headers: {
@@ -5355,6 +5355,13 @@ export class Instructions extends HeyApiClient {
         ...params.headers,
       },
     })
+  }
+}
+
+export class Instructions extends HeyApiClient {
+  private _entry?: Entry
+  get entry(): Entry {
+    return (this._entry ??= new Entry({ client: this.client }))
   }
 }
 

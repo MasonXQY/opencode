@@ -16492,16 +16492,16 @@ export type V2SessionContextResponses = {
 
 export type V2SessionContextResponse = V2SessionContextResponses[keyof V2SessionContextResponses]
 
-export type V2SessionInstructionsListData = {
+export type V2SessionInstructionsEntryListData = {
   body?: never
   path: {
     sessionID: string
   }
   query?: never
-  url: "/api/session/{sessionID}/instructions"
+  url: "/api/session/{sessionID}/instructions/entries"
 }
 
-export type V2SessionInstructionsListErrors = {
+export type V2SessionInstructionsEntryListErrors = {
   /**
    * InvalidRequestError
    */
@@ -16516,9 +16516,10 @@ export type V2SessionInstructionsListErrors = {
   404: SessionNotFoundErrorV2
 }
 
-export type V2SessionInstructionsListError = V2SessionInstructionsListErrors[keyof V2SessionInstructionsListErrors]
+export type V2SessionInstructionsEntryListError =
+  V2SessionInstructionsEntryListErrors[keyof V2SessionInstructionsEntryListErrors]
 
-export type V2SessionInstructionsListResponses = {
+export type V2SessionInstructionsEntryListResponses = {
   /**
    * Success
    */
@@ -16527,20 +16528,20 @@ export type V2SessionInstructionsListResponses = {
   }
 }
 
-export type V2SessionInstructionsListResponse =
-  V2SessionInstructionsListResponses[keyof V2SessionInstructionsListResponses]
+export type V2SessionInstructionsEntryListResponse =
+  V2SessionInstructionsEntryListResponses[keyof V2SessionInstructionsEntryListResponses]
 
-export type V2SessionInstructionsRemoveData = {
+export type V2SessionInstructionsEntryRemoveData = {
   body?: never
   path: {
     sessionID: string
     key: InstructionEntryKey2
   }
   query?: never
-  url: "/api/session/{sessionID}/instructions/{key}"
+  url: "/api/session/{sessionID}/instructions/entries/{key}"
 }
 
-export type V2SessionInstructionsRemoveErrors = {
+export type V2SessionInstructionsEntryRemoveErrors = {
   /**
    * InvalidRequestError
    */
@@ -16555,20 +16556,20 @@ export type V2SessionInstructionsRemoveErrors = {
   404: SessionNotFoundErrorV2
 }
 
-export type V2SessionInstructionsRemoveError =
-  V2SessionInstructionsRemoveErrors[keyof V2SessionInstructionsRemoveErrors]
+export type V2SessionInstructionsEntryRemoveError =
+  V2SessionInstructionsEntryRemoveErrors[keyof V2SessionInstructionsEntryRemoveErrors]
 
-export type V2SessionInstructionsRemoveResponses = {
+export type V2SessionInstructionsEntryRemoveResponses = {
   /**
    * <No Content>
    */
   204: void
 }
 
-export type V2SessionInstructionsRemoveResponse =
-  V2SessionInstructionsRemoveResponses[keyof V2SessionInstructionsRemoveResponses]
+export type V2SessionInstructionsEntryRemoveResponse =
+  V2SessionInstructionsEntryRemoveResponses[keyof V2SessionInstructionsEntryRemoveResponses]
 
-export type V2SessionInstructionsPutData = {
+export type V2SessionInstructionsEntryPutData = {
   body: {
     value: unknown
   }
@@ -16577,10 +16578,10 @@ export type V2SessionInstructionsPutData = {
     key: InstructionEntryKey2
   }
   query?: never
-  url: "/api/session/{sessionID}/instructions/{key}"
+  url: "/api/session/{sessionID}/instructions/entries/{key}"
 }
 
-export type V2SessionInstructionsPutErrors = {
+export type V2SessionInstructionsEntryPutErrors = {
   /**
    * InvalidRequestError
    */
@@ -16595,17 +16596,18 @@ export type V2SessionInstructionsPutErrors = {
   404: SessionNotFoundErrorV2
 }
 
-export type V2SessionInstructionsPutError = V2SessionInstructionsPutErrors[keyof V2SessionInstructionsPutErrors]
+export type V2SessionInstructionsEntryPutError =
+  V2SessionInstructionsEntryPutErrors[keyof V2SessionInstructionsEntryPutErrors]
 
-export type V2SessionInstructionsPutResponses = {
+export type V2SessionInstructionsEntryPutResponses = {
   /**
    * <No Content>
    */
   204: void
 }
 
-export type V2SessionInstructionsPutResponse =
-  V2SessionInstructionsPutResponses[keyof V2SessionInstructionsPutResponses]
+export type V2SessionInstructionsEntryPutResponse =
+  V2SessionInstructionsEntryPutResponses[keyof V2SessionInstructionsEntryPutResponses]
 
 export type V2SessionLogData = {
   body?: never

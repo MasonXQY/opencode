@@ -45,13 +45,13 @@ test("session instructions methods use the public HTTP contract", async () => {
   })
   const result = await Effect.gen(function* () {
     const client = yield* OpenCode.make({ baseUrl: "http://localhost:3000" })
-    const listed = yield* client.session.instructions.list({ sessionID: Session.ID.make("ses_test") })
-    yield* client.session.instructions.put({
+    const listed = yield* client.session.instructions.entry.list({ sessionID: Session.ID.make("ses_test") })
+    yield* client.session.instructions.entry.put({
       sessionID: Session.ID.make("ses_test"),
       key: "review-notes",
       value: instructions[0].value,
     })
-    yield* client.session.instructions.remove({
+    yield* client.session.instructions.entry.remove({
       sessionID: Session.ID.make("ses_test"),
       key: "review-notes",
     })
@@ -62,17 +62,17 @@ test("session instructions methods use the public HTTP contract", async () => {
   expect(requests).toEqual([
     {
       method: "GET",
-      url: "http://localhost:3000/api/session/ses_test/instructions",
+      url: "http://localhost:3000/api/session/ses_test/instructions/entries",
       body: undefined,
     },
     {
       method: "PUT",
-      url: "http://localhost:3000/api/session/ses_test/instructions/review-notes",
+      url: "http://localhost:3000/api/session/ses_test/instructions/entries/review-notes",
       body: { value: { text: "Check the diff", priority: 1 } },
     },
     {
       method: "DELETE",
-      url: "http://localhost:3000/api/session/ses_test/instructions/review-notes",
+      url: "http://localhost:3000/api/session/ses_test/instructions/entries/review-notes",
       body: undefined,
     },
   ])

@@ -161,18 +161,14 @@ describe("InstructionDiscovery", () => {
           yield* Effect.promise(() => fs.writeFile(packageFile, "changed"))
           expect(yield* Instructions.reconcile(yield* load, initialized.applied)).toMatchObject({
             _tag: "Updated",
-            text: expect.stringContaining(`Instructions from: ${packageFile}\nchanged`),
+            text: `The instructions from ${packageFile} changed to:\nchanged`,
           })
 
           yield* Effect.promise(() => fs.rm(packageFile))
           const partial = yield* Instructions.reconcile(yield* load, initialized.applied)
           expect(partial).toEqual({
             _tag: "Updated",
-            text: [
-              "These instructions replace all previously loaded instructions.",
-              `Instructions from: ${globalFile}\nglobal`,
-              `Instructions from: ${projectFile}\nproject`,
-            ].join("\n\n"),
+            text: `Instructions from the following files no longer apply: ${packageFile}.`,
             applied: expect.any(Object),
           })
 
@@ -234,6 +230,43 @@ describe("InstructionDiscovery", () => {
     ),
   )
 
+  it.live("re-reads discovered files so mid-session edits reach the model", () =>
+    withDurableDiscovery(({ directory, sessionID }) =>
+      Effect.gen(function* () {
+        const file = path.join(directory, "src", "AGENTS.md")
+        yield* Effect.promise(() => fs.mkdir(path.dirname(file), { recursive: true }))
+        yield* Effect.promise(() => fs.writeFile(file, "frozen"))
+        const discovery = yield* InstructionDiscovery.Service
+        yield* discovery.discover({ sessionID, assistantMessageID, paths: [file] })
+
+        const initialized = yield* Instructions.initialize(yield* discovery.load(sessionID))
+        expect(initialized.text).toContain(`Instructions from: ${file}\nfrozen`)
+
+        yield* Effect.promise(() => fs.writeFile(file, "edited"))
+        expect(yield* Instructions.reconcile(yield* discovery.load(sessionID), initialized.applied)).toMatchObject({
+          _tag: "Updated",
+          text: `The instructions from ${file} changed to:\nedited`,
+        })
+      }),
+    ),
+  )
+
+  it.live("falls back to frozen content when a discovered file disappears", () =>
+    withDurableDiscovery(({ directory, sessionID }) =>
+      Effect.gen(function* () {
+        const file = path.join(directory, "src", "AGENTS.md")
+        yield* Effect.promise(() => fs.mkdir(path.dirname(file), { recursive: true }))
+        yield* Effect.promise(() => fs.writeFile(file, "frozen"))
+        const discovery = yield* InstructionDiscovery.Service
+        yield* discovery.discover({ sessionID, assistantMessageID, paths: [file] })
+        yield* Effect.promise(() => fs.rm(file))
+
+        const initialized = yield* Instructions.initialize(yield* discovery.load(sessionID))
+        expect(initialized.text).toContain(`Instructions from: ${file}\nfrozen`)
+      }),
+    ),
+  )
+
   it.live("deduplicates repeated and parallel discovery", () =>
     withDurableDiscovery(({ directory, sessionID }) =>
       Effect.gen(function* () {
@@ -263,9 +296,7 @@ describe("InstructionDiscovery", () => {
           .from(InstructionFileTable)
           .all()
           .pipe(Effect.orDie)
-        expect(rows.map((row) => row.path).sort()).toEqual(
-          [AbsolutePath.make(first), AbsolutePath.make(second)].sort(),
-        )
+        expect(rows.map((row) => row.path).sort()).toEqual([AbsolutePath.make(first), AbsolutePath.make(second)].sort())
       }),
     ),
   )

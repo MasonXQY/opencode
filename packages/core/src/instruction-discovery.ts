@@ -52,8 +52,7 @@ const layer = Layer.effect(
         codec: Schema.toCodecJson(Files),
         load: Effect.succeed(value),
         baseline: render,
-        update: (_previous, current) =>
-          `These instructions replace all previously loaded instructions.\n\n${render(current)}`,
+        update,
         removed: () => "Previously loaded instructions no longer apply.",
       })
 
@@ -93,7 +92,7 @@ const layer = Layer.effect(
       return files.filter((file): file is File => file !== undefined)
     })
 
-    const observe = Effect.fn("InstructionDiscovery.load")(function* (sessionID: SessionSchema.ID) {
+    const observe = Effect.fnUntraced(function* (sessionID: SessionSchema.ID) {
       const ambient = yield* observeAmbient()
       if (ambient === Instructions.unavailable) return source(ambient)
       const stored = yield* db
@@ -108,21 +107,25 @@ const layer = Layer.effect(
         .all()
         .pipe(Effect.orDie)
       const seen = new Set(ambient.map((file) => file.path))
-      const files = [
-        ...ambient,
-        ...stored.flatMap((file) => {
-          if (seen.has(file.path)) return []
-          seen.add(file.path)
-          return [new File({ path: file.path, content: file.content })]
-        }),
-      ]
+      // Discovered files are re-observed live so mid-session edits reach the model;
+      // the frozen discovery content only stands in when the file cannot be read.
+      const discovered = yield* Effect.forEach(
+        stored.filter((file) => !seen.has(file.path)),
+        (file) =>
+          fs
+            .readFileStringSafe(file.path)
+            .pipe(Effect.map((content) => new File({ path: file.path, content: content ?? file.content }))),
+        { concurrency: "unbounded" },
+      )
+      const files = [...ambient, ...discovered]
       return files.length === 0 ? Instructions.empty : source(files)
     })
 
-    const load = (sessionID: SessionSchema.ID) =>
-      observe(sessionID).pipe(Effect.catch(() => Effect.succeed(source(Instructions.unavailable))))
+    const load = Effect.fn("InstructionDiscovery.load")(function* (sessionID: SessionSchema.ID) {
+      return yield* observe(sessionID).pipe(Effect.catch(() => Effect.succeed(source(Instructions.unavailable))))
+    })
 
-    const admit = Effect.fn("InstructionDiscovery.discover")(function* (input: {
+    const admit = Effect.fnUntraced(function* (input: {
       readonly sessionID: SessionSchema.ID
       readonly assistantMessageID: SessionMessage.ID
       readonly paths: ReadonlyArray<string>
@@ -130,30 +133,24 @@ const layer = Layer.effect(
       const paths = Array.dedupe(yield* Effect.forEach(input.paths, fs.resolve))
       if (paths.length === 0) return
       const existing = new Set(
-        (
-          yield* db
-            .select({ path: InstructionFileTable.path })
-            .from(InstructionFileTable)
-            .where(eq(InstructionFileTable.session_id, input.sessionID))
-            .all()
-            .pipe(Effect.orDie)
-        ).map((row) => row.path),
+        (yield* db
+          .select({ path: InstructionFileTable.path })
+          .from(InstructionFileTable)
+          .where(eq(InstructionFileTable.session_id, input.sessionID))
+          .all()
+          .pipe(Effect.orDie)).map((row) => row.path),
       )
       const files = yield* Effect.forEach(
         paths.filter((path) => !existing.has(AbsolutePath.make(path))),
         (path) =>
-          fs.readFileStringSafe(path).pipe(
-            Effect.map((content) =>
-              content === undefined
-                ? undefined
-                : { path: AbsolutePath.make(path), content },
+          fs
+            .readFileStringSafe(path)
+            .pipe(
+              Effect.map((content) => (content === undefined ? undefined : { path: AbsolutePath.make(path), content })),
             ),
-          ),
         { concurrency: "unbounded" },
       )
-      const readable = files.filter(
-        (file): file is { path: AbsolutePath; content: string } => file !== undefined,
-      )
+      const readable = files.filter((file): file is { path: AbsolutePath; content: string } => file !== undefined)
       if (readable.length === 0) return
       yield* events.publish(SessionEvent.InstructionsDiscovered, {
         sessionID: input.sessionID,
@@ -163,7 +160,9 @@ const layer = Layer.effect(
       })
     })
 
-    const discover = (input: Parameters<typeof admit>[0]) => lock.withPermit(admit(input))
+    const discover = Effect.fn("InstructionDiscovery.discover")(function* (input: Parameters<typeof admit>[0]) {
+      yield* lock.withPermit(admit(input))
+    })
 
     return Service.of({ load, discover })
   }),
@@ -176,5 +175,33 @@ export const node = makeLocationNode({
 })
 
 function render(files: ReadonlyArray<File>) {
-  return files.map((file) => `Instructions from: ${file.path}\n${file.content}`).join("\n\n")
+  return files.map(renderFile).join("\n\n")
+}
+
+function renderFile(file: File) {
+  return `Instructions from: ${file.path}\n${file.content}`
+}
+
+// Per-file deltas keep chronological updates small as discoveries accumulate. A
+// pure reordering has no per-file story to tell, so it restates the full set.
+function update(previous: ReadonlyArray<File>, current: ReadonlyArray<File>) {
+  const diff = Instructions.diffByKey(
+    previous,
+    current,
+    (file) => file.path,
+    (before, after) => before.content !== after.content,
+  )
+  if (diff.added.length === 0 && diff.removed.length === 0 && diff.changed.length === 0)
+    return ["These instructions replace all previously loaded instructions.", render(current)].join("\n\n")
+  return [
+    ...diff.added.map(renderFile),
+    ...diff.changed.map(
+      (change) => `The instructions from ${change.current.path} changed to:\n${change.current.content}`,
+    ),
+    ...(diff.removed.length === 0
+      ? []
+      : [
+          `Instructions from the following files no longer apply: ${diff.removed.map((file) => file.path).join(", ")}.`,
+        ]),
+  ].join("\n\n")
 }

@@ -544,14 +544,14 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
         }),
       )
       .handle(
-        "session.instructions.list",
+        "session.instructions.entry.list",
         Effect.fn(function* (ctx) {
           const instructions = yield* InstructionEntry.Service
           return { data: yield* instructions.list(ctx.params.sessionID) }
         }),
       )
       .handle(
-        "session.instructions.put",
+        "session.instructions.entry.put",
         Effect.fn(function* (ctx) {
           const instructions = yield* InstructionEntry.Service
           yield* instructions.put({ sessionID: ctx.params.sessionID, key: ctx.params.key, value: ctx.payload.value })
@@ -559,7 +559,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
         }),
       )
       .handle(
-        "session.instructions.remove",
+        "session.instructions.entry.remove",
         Effect.fn(function* (ctx) {
           const instructions = yield* InstructionEntry.Service
           yield* instructions.remove({ sessionID: ctx.params.sessionID, key: ctx.params.key })

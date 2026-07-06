@@ -163,29 +163,29 @@ test("session instructions methods use the public HTTP contract", async () => {
     },
   })
 
-  const result = await client.session.instructions.list({ sessionID: "ses_test" })
-  await client.session.instructions.put({
+  const result = await client.session.instructions.entry.list({ sessionID: "ses_test" })
+  await client.session.instructions.entry.put({
     sessionID: "ses_test",
     key: "review-notes",
     value: instructions[0].value,
   })
-  await client.session.instructions.remove({ sessionID: "ses_test", key: "review-notes" })
+  await client.session.instructions.entry.remove({ sessionID: "ses_test", key: "review-notes" })
 
   expect(result).toEqual(instructions)
   expect(requests).toEqual([
     {
       method: "GET",
-      url: "http://localhost:3000/api/session/ses_test/instructions",
+      url: "http://localhost:3000/api/session/ses_test/instructions/entries",
       body: undefined,
     },
     {
       method: "PUT",
-      url: "http://localhost:3000/api/session/ses_test/instructions/review-notes",
+      url: "http://localhost:3000/api/session/ses_test/instructions/entries/review-notes",
       body: { value: { text: "Check the diff", priority: 1 } },
     },
     {
       method: "DELETE",
-      url: "http://localhost:3000/api/session/ses_test/instructions/review-notes",
+      url: "http://localhost:3000/api/session/ses_test/instructions/entries/review-notes",
       body: undefined,
     },
   ])

@@ -15,7 +15,7 @@ type DatabaseService = Database.Interface["db"]
 const decodeApplied = Schema.decodeUnknownOption(Instructions.Applied)
 
 /**
- * Loads or creates the session's durable context checkpoint, narrating any
+ * Loads or creates the session's durable instruction checkpoint, narrating any
  * drift since the model was last told as a chronological update. Completed
  * compaction rebaselines; nothing else rewrites the baseline. Runs before
  * input promotion so a blocked first step leaves pending inputs untouched.
@@ -111,7 +111,7 @@ const rewrite = Effect.fnUntraced(function* (
     .returning({ sessionID: InstructionCheckpointTable.session_id })
     .get()
     .pipe(Effect.orDie)
-  if (!updated) return yield* Effect.die(new Error("Context checkpoint not found"))
+  if (!updated) return yield* Effect.die(new Error("Instruction checkpoint not found"))
 })
 
 const advance = Effect.fnUntraced(function* (
@@ -126,5 +126,5 @@ const advance = Effect.fnUntraced(function* (
     .returning({ sessionID: InstructionCheckpointTable.session_id })
     .get()
     .pipe(Effect.orDie)
-  if (!updated) return yield* Effect.die(new Error("Context checkpoint not found"))
+  if (!updated) return yield* Effect.die(new Error("Instruction checkpoint not found"))
 })

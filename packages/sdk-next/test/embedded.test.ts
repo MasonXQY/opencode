@@ -68,11 +68,11 @@ it.live(
           resume: false,
         })
         const context = yield* opencode.sessions.context({ sessionID: id })
-        yield* opencode.sessions.instructions.put({ sessionID: id, key: "deploy-target", value: "production" })
-        yield* opencode.sessions.instructions.put({ sessionID: id, key: "flags", value: { beta: true } })
-        const contextEntries = yield* opencode.sessions.instructions.list({ sessionID: id })
-        yield* opencode.sessions.instructions.remove({ sessionID: id, key: "flags" })
-        const remainingContextEntries = yield* opencode.sessions.instructions.list({ sessionID: id })
+        yield* opencode.sessions.instructions.entry.put({ sessionID: id, key: "deploy-target", value: "production" })
+        yield* opencode.sessions.instructions.entry.put({ sessionID: id, key: "flags", value: { beta: true } })
+        const contextEntries = yield* opencode.sessions.instructions.entry.list({ sessionID: id })
+        yield* opencode.sessions.instructions.entry.remove({ sessionID: id, key: "flags" })
+        const remainingContextEntries = yield* opencode.sessions.instructions.entry.list({ sessionID: id })
         const wake = yield* opencode.sessions.prompt({
           sessionID: id,
           prompt: fixture.sdk.Prompt.make({ text: "Promote this input" }),
@@ -102,7 +102,7 @@ it.live(
             opencode.sessions.log({ sessionID: missingSessionID }).pipe(Stream.runHead, Effect.flip),
             opencode.sessions.interrupt({ sessionID: missingSessionID }).pipe(Effect.flip),
             opencode.sessions.message({ sessionID: missingSessionID, messageID: modelMessage.id }).pipe(Effect.flip),
-            opencode.sessions.instructions.list({ sessionID: missingSessionID }).pipe(Effect.flip),
+            opencode.sessions.instructions.entry.list({ sessionID: missingSessionID }).pipe(Effect.flip),
           ],
           { concurrency: "unbounded" },
         )

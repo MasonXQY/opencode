@@ -21,7 +21,7 @@ One independently observed typed value within **Instructions**, represented by a
 _Avoid_: Prompt fragment
 
 **InstructionEntry**:
-One API-managed, durable, per-Session instruction value. Its slash-free client key maps to the `api/<key>` **Instruction Source** key.
+One API-managed, durable, per-Session instruction value. Its slash-free client key maps to the `api/<key>` **Instruction Source** key. Entries deliberately render to the model as mechanism-neutral `<context>` blocks: the model sees session context, not how it was attached.
 
 **InstructionDiscovery**:
 The Location-scoped service that combines ambient global and upward-project `AGENTS.md` files with durable per-Session path-local `AGENTS.md` files discovered after successful reads.

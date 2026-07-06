@@ -4,9 +4,9 @@
 
 - Rename the System Context algebra to `Instructions`, API-managed `SessionContextEntry` records to `InstructionEntry`, and the session-owned context checkpoint to `InstructionCheckpoint`.
 - Rename the durable update event from `session.context.updated` to `session.instructions.updated`.
-- Rename the API-managed entry routes from `/api/session/:sessionID/context-entry` to `/api/session/:sessionID/instructions` and their operation identifiers from `session.context.entry.*` to `session.instructions.*`.
+- Rename the API-managed entry routes from `/api/session/:sessionID/context-entry` to `/api/session/:sessionID/instructions/entries` and their operation identifiers from `session.context.entry.*` to `session.instructions.entry.*`, keeping bare `session.instructions.*` free for the composed instruction surface.
 - Add durable per-Session path-local instruction files and make `InstructionDiscovery` combine them with ambient global and upward-project `AGENTS.md` files.
-- Record successful path-local discovery as `session.instructions.discovered`; projection stores frozen file content with the owning assistant-message boundary before `InstructionCheckpoint` admits it.
+- Record successful path-local discovery as `session.instructions.discovered`; projection stores the discovered path and content with the owning assistant-message boundary before `InstructionCheckpoint` admits it. Observation re-reads discovered files live, falling back to the stored content only when a file becomes unreadable.
 - Remove the context registry seam. The runner explicitly composes instruction built-ins, discovery, selected-agent skill guidance, reference guidance, MCP guidance, and `InstructionEntry` values.
 
 Compatibility:

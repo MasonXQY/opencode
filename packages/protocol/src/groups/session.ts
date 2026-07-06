@@ -451,7 +451,7 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S>(sessionLo
         ),
     )
     .add(
-      HttpApiEndpoint.get("session.instructions.list", "/api/session/:sessionID/instructions", {
+      HttpApiEndpoint.get("session.instructions.entry.list", "/api/session/:sessionID/instructions/entries", {
         params: { sessionID: Session.ID },
         success: Schema.Struct({ data: Schema.Array(InstructionEntry.Info) }),
         error: SessionNotFoundError,
@@ -459,14 +459,14 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S>(sessionLo
         .middleware(sessionLocationMiddleware)
         .annotateMerge(
           OpenApi.annotations({
-            identifier: "v2.session.instructions.list",
+            identifier: "v2.session.instructions.entry.list",
             summary: "List instruction entries",
             description: "List API-managed instruction entries attached to the session.",
           }),
         ),
     )
     .add(
-      HttpApiEndpoint.put("session.instructions.put", "/api/session/:sessionID/instructions/:key", {
+      HttpApiEndpoint.put("session.instructions.entry.put", "/api/session/:sessionID/instructions/entries/:key", {
         params: { sessionID: Session.ID, key: InstructionEntry.Key },
         payload: Schema.Struct({ value: Schema.Json }),
         success: HttpApiSchema.NoContent,
@@ -475,7 +475,7 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S>(sessionLo
         .middleware(sessionLocationMiddleware)
         .annotateMerge(
           OpenApi.annotations({
-            identifier: "v2.session.instructions.put",
+            identifier: "v2.session.instructions.entry.put",
             summary: "Put instruction entry",
             description:
               "Attach or replace one durable instruction entry. Changes announce as updates at the next step boundary.",
@@ -483,7 +483,7 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S>(sessionLo
         ),
     )
     .add(
-      HttpApiEndpoint.delete("session.instructions.remove", "/api/session/:sessionID/instructions/:key", {
+      HttpApiEndpoint.delete("session.instructions.entry.remove", "/api/session/:sessionID/instructions/entries/:key", {
         params: { sessionID: Session.ID, key: InstructionEntry.Key },
         success: HttpApiSchema.NoContent,
         error: SessionNotFoundError,
@@ -491,7 +491,7 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S>(sessionLo
         .middleware(sessionLocationMiddleware)
         .annotateMerge(
           OpenApi.annotations({
-            identifier: "v2.session.instructions.remove",
+            identifier: "v2.session.instructions.entry.remove",
             summary: "Remove instruction entry",
             description:
               "Remove one instruction entry; the removal is announced to the model at the next step boundary.",

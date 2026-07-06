@@ -1095,26 +1095,26 @@ export type SessionContextOutput = {
   >
 }["data"]
 
-export type SessionInstructionsListInput = { readonly sessionID: { readonly sessionID: string }["sessionID"] }
+export type SessionInstructionsEntryListInput = { readonly sessionID: { readonly sessionID: string }["sessionID"] }
 
-export type SessionInstructionsListOutput = {
+export type SessionInstructionsEntryListOutput = {
   readonly data: ReadonlyArray<{ readonly key: string; readonly value: JsonValue }>
 }["data"]
 
-export type SessionInstructionsPutInput = {
+export type SessionInstructionsEntryPutInput = {
   readonly sessionID: { readonly sessionID: string; readonly key: string }["sessionID"]
   readonly key: { readonly sessionID: string; readonly key: string }["key"]
   readonly value: { readonly value: JsonValue }["value"]
 }
 
-export type SessionInstructionsPutOutput = void
+export type SessionInstructionsEntryPutOutput = void
 
-export type SessionInstructionsRemoveInput = {
+export type SessionInstructionsEntryRemoveInput = {
   readonly sessionID: { readonly sessionID: string; readonly key: string }["sessionID"]
   readonly key: { readonly sessionID: string; readonly key: string }["key"]
 }
 
-export type SessionInstructionsRemoveOutput = void
+export type SessionInstructionsEntryRemoveOutput = void
 
 export type SessionLogInput = {
   readonly sessionID: { readonly sessionID: string }["sessionID"]
