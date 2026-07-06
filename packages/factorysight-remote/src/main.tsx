@@ -676,7 +676,28 @@ function WorkflowCanvas(props: {
   onSelectTask: (id: string) => void
   onRefresh: () => void
 }) {
+  let nodeViewport: HTMLDivElement | undefined
   const percent = createMemo(() => progressValue(props.chainTasks.length ? props.chainTasks : props.tasks))
+  const visibleTasks = createMemo(() => (props.chainTasks.length ? props.chainTasks : props.tasks.slice(0, 8)))
+  const [zoom, setZoom] = createSignal(1)
+  const zoomLabel = createMemo(() => `${Math.round(zoom() * 100)}%`)
+  const updateZoom = (delta: number) => setZoom((value) => Math.min(1.28, Math.max(0.72, value + delta)))
+  const focusSelectedNode = () =>
+    requestAnimationFrame(() => {
+      nodeViewport
+        ?.querySelector(".workflow-node.selected")
+        ?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" })
+    })
+  const fitCanvas = () => {
+    setZoom(visibleTasks().length > 5 ? 0.82 : 0.92)
+    requestAnimationFrame(() => nodeViewport?.scrollTo({ left: 0, behavior: "smooth" }))
+  }
+
+  createEffect(() => {
+    props.selectedTaskId
+    focusSelectedNode()
+  })
+
   return (
     <section class="workflow-canvas">
       <div class="canvas-grid" aria-hidden="true" />
@@ -693,34 +714,53 @@ function WorkflowCanvas(props: {
           <button>Run workflow</button>
         </div>
       </div>
-      <div class="canvas-progress">
-        <span>{percent()}% complete</span>
-        <div>
-          <i style={{ width: `${percent()}%` }} />
+      <div class="canvas-toolbar">
+        <div class="canvas-progress">
+          <span>{percent()}% complete</span>
+          <div>
+            <i style={{ width: `${percent()}%` }} />
+          </div>
+        </div>
+        <div class="canvas-zoom" aria-label="Canvas navigation">
+          <button type="button" class="icon-button" onClick={() => updateZoom(-0.08)} aria-label="Zoom out">
+            -
+          </button>
+          <span>{zoomLabel()}</span>
+          <button type="button" class="icon-button" onClick={() => updateZoom(0.08)} aria-label="Zoom in">
+            +
+          </button>
+          <button type="button" class="secondary" onClick={fitCanvas}>
+            Fit
+          </button>
+          <button type="button" class="secondary" onClick={focusSelectedNode}>
+            Focus
+          </button>
         </div>
       </div>
       <Show when={props.chainTasks.length || props.tasks.length} fallback={<CanvasEmpty />}>
-        <div class="node-flow">
-          <For each={props.chainTasks.length ? props.chainTasks : props.tasks.slice(0, 8)}>
-            {(task, index) => (
-              <button
-                class="workflow-node"
-                classList={{
-                  selected: task.id === props.selectedTaskId,
-                  completed: task.status === "completed",
-                  failed: task.status === "failed",
-                }}
-                onClick={() => props.onSelectTask(task.id)}
-              >
-                <span class={`node-index ${task.status}`}>{index() + 1}</span>
-                <AgentCard data={props.data} agent={task.agent} />
-                <strong>{task.kind === "orchestration" ? "Primary planner" : task.title}</strong>
-                <small>
-                  {taskStage(task)} · {statusLabel(task.status)}
-                </small>
-              </button>
-            )}
-          </For>
+        <div class="node-viewport" ref={nodeViewport}>
+          <div class="node-flow" style={{ "--canvas-zoom": zoom() }}>
+            <For each={visibleTasks()}>
+              {(task, index) => (
+                <button
+                  class="workflow-node"
+                  classList={{
+                    selected: task.id === props.selectedTaskId,
+                    completed: task.status === "completed",
+                    failed: task.status === "failed",
+                  }}
+                  onClick={() => props.onSelectTask(task.id)}
+                >
+                  <span class={`node-index ${task.status}`}>{index() + 1}</span>
+                  <AgentCard data={props.data} agent={task.agent} />
+                  <strong>{task.kind === "orchestration" ? "Primary planner" : task.title}</strong>
+                  <small>
+                    {taskStage(task)} · {statusLabel(task.status)}
+                  </small>
+                </button>
+              )}
+            </For>
+          </div>
         </div>
       </Show>
       <div class="canvas-footer">
@@ -1011,38 +1051,44 @@ function MissionCommandBar(props: {
           />
         </div>
         <div class="mission-options">
-          <select value={mode()} onChange={(event) => setMode(event.currentTarget.value as ComposeMode)}>
-            <option value="swarm">Agent swarm</option>
-            <option value="direct">Direct agent</option>
-          </select>
-          <Show
-            when={mode() === "swarm"}
-            fallback={
-              <select value={agent()} onChange={(event) => setAgent(event.currentTarget.value)}>
-                <For each={props.data.agents}>
-                  {(item) => <option value={item}>{props.data.agentProfiles[item]?.name ?? item}</option>}
-                </For>
-              </select>
-            }
-          >
-            <select value={scale()} onChange={(event) => setScale(event.currentTarget.value as Scale)}>
-              <option value="focused">Focused</option>
-              <option value="balanced">Balanced</option>
-              <option value="wide">Wide</option>
+          <div class="mission-selects">
+            <select value={mode()} onChange={(event) => setMode(event.currentTarget.value as ComposeMode)}>
+              <option value="swarm">Agent swarm</option>
+              <option value="direct">Direct agent</option>
             </select>
-          </Show>
-          <select value={model()} onChange={(event) => setModel(event.currentTarget.value)}>
-            <For each={props.data.models}>{(item) => <option value={item}>{item}</option>}</For>
-          </select>
-          <select value={style()} onChange={(event) => setStyle(event.currentTarget.value as ProductStyleId)}>
-            <For each={productStyles}>{(item) => <option value={item.id}>{item.name}</option>}</For>
-          </select>
-          <input value={notes()} onInput={(event) => setNotes(event.currentTarget.value)} placeholder="Style notes" />
-          <label class="attach-control">
-            {files().length ? `${files().length} files` : "Attach"}
-            <input type="file" multiple onChange={(event) => setFiles(Array.from(event.currentTarget.files ?? []))} />
-          </label>
-          <button disabled={!props.project || !prompt().trim() || busy()}>{busy() ? "Launching..." : "Launch"}</button>
+            <Show
+              when={mode() === "swarm"}
+              fallback={
+                <select value={agent()} onChange={(event) => setAgent(event.currentTarget.value)}>
+                  <For each={props.data.agents}>
+                    {(item) => <option value={item}>{props.data.agentProfiles[item]?.name ?? item}</option>}
+                  </For>
+                </select>
+              }
+            >
+              <select value={scale()} onChange={(event) => setScale(event.currentTarget.value as Scale)}>
+                <option value="focused">Focused</option>
+                <option value="balanced">Balanced</option>
+                <option value="wide">Wide</option>
+              </select>
+            </Show>
+            <select value={model()} onChange={(event) => setModel(event.currentTarget.value)}>
+              <For each={props.data.models}>{(item) => <option value={item}>{item}</option>}</For>
+            </select>
+            <select value={style()} onChange={(event) => setStyle(event.currentTarget.value as ProductStyleId)}>
+              <For each={productStyles}>{(item) => <option value={item.id}>{item.name}</option>}</For>
+            </select>
+            <input value={notes()} onInput={(event) => setNotes(event.currentTarget.value)} placeholder="Style notes" />
+          </div>
+          <div class="mission-actions">
+            <label class="attach-control">
+              {files().length ? `${files().length} files` : "Attach"}
+              <input type="file" multiple onChange={(event) => setFiles(Array.from(event.currentTarget.files ?? []))} />
+            </label>
+            <button disabled={!props.project || !prompt().trim() || busy()}>
+              {busy() ? "Launching..." : "Launch"}
+            </button>
+          </div>
         </div>
       </form>
     </section>

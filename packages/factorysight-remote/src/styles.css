@@ -582,7 +582,7 @@ label {
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: 14px;
   overflow: hidden;
-  padding: 24px 24px 18px;
+  padding: 22px 22px 16px;
   background: var(--canvas);
 }
 
@@ -596,7 +596,9 @@ label {
 }
 
 .workflow-header,
+.canvas-toolbar,
 .canvas-progress,
+.node-viewport,
 .node-flow,
 .canvas-footer,
 .canvas-empty {
@@ -643,11 +645,18 @@ label {
   text-transform: uppercase;
 }
 
+.canvas-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 420px) auto;
+  align-items: center;
+  justify-content: end;
+  gap: 14px;
+}
+
 .canvas-progress {
   display: grid;
   gap: 7px;
-  width: min(420px, 58%);
-  margin-left: auto;
+  min-width: 220px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 780;
@@ -667,15 +676,54 @@ label {
   background: linear-gradient(90deg, #111, #6974ff);
 }
 
-.node-flow {
+.canvas-zoom {
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.58);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.75);
+}
+
+.canvas-zoom button {
+  min-width: 32px;
+  min-height: 30px;
+  padding: 5px 9px;
+  font-size: 12px;
+}
+
+.canvas-zoom span {
+  min-width: 46px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 820;
+  text-align: center;
+}
+
+.node-viewport {
   min-width: 0;
   min-height: 0;
+  overflow: auto;
+  border: 1px solid rgb(255 255 255 / 0.48);
+  border-radius: 24px;
+  background: rgb(255 255 255 / 0.18);
+}
+
+.node-flow {
+  --canvas-zoom: 1;
+  min-width: max-content;
+  min-height: 100%;
   display: flex;
   align-items: center;
   gap: 46px;
-  overflow: auto;
-  padding: 30px 86px 54px 28px;
+  padding: 28px 84px 46px 28px;
   scroll-padding-inline: 28px 86px;
+  transform: scale(var(--canvas-zoom));
+  transform-origin: left center;
+  transition: transform 180ms ease;
 }
 
 .workflow-node {
@@ -808,6 +856,7 @@ label {
 
 .canvas-footer {
   justify-content: center;
+  flex-wrap: wrap;
   color: var(--muted);
   font-size: 12px;
   font-weight: 780;
@@ -820,13 +869,19 @@ label {
   background: rgb(255 255 255 / 0.42);
 }
 
+.inspector-card {
+  gap: 10px;
+  padding: 12px;
+  border-radius: 18px;
+}
+
 .inspector-card.hero {
-  gap: 13px;
+  gap: 11px;
 }
 
 .inspector-card h2 {
-  font-size: 18px;
-  line-height: 24px;
+  font-size: 16px;
+  line-height: 21px;
 }
 
 .inspector-card p {
@@ -843,7 +898,7 @@ label {
 }
 
 .step-tabs span {
-  padding: 7px 8px;
+  padding: 6px 8px;
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--muted);
@@ -899,7 +954,7 @@ label {
 }
 
 .output-preview {
-  max-height: 210px;
+  max-height: 180px;
   overflow: auto;
   margin: 0;
   padding: 12px;
@@ -912,7 +967,7 @@ label {
 }
 
 .timeline {
-  max-height: 320px;
+  max-height: 260px;
   overflow: auto;
 }
 
@@ -920,7 +975,7 @@ label {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 4px 8px;
-  padding: 10px 0;
+  padding: 8px 0;
   border-top: 1px solid var(--line);
 }
 
@@ -946,23 +1001,28 @@ label {
   gap: 8px;
 }
 
+.message-form textarea {
+  min-height: 88px;
+}
+
 .action-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
 }
 
 .mission-bar {
-  padding: 12px 18px 16px;
+  min-width: 0;
+  padding: 10px 16px 14px;
   border-top: 1px solid var(--line);
 }
 
 .mission-bar form {
   display: grid;
-  grid-template-columns: minmax(520px, 1fr) minmax(650px, 0.95fr);
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
   padding: 10px;
-  border: 1px solid rgb(255 255 255 / 0.82);
-  border-radius: 26px;
+  border: 1px solid rgb(255 255 255 / 0.78);
+  border-radius: 22px;
   background: rgb(255 255 255 / 0.66);
   box-shadow: var(--shadow-soft);
   backdrop-filter: blur(16px);
@@ -971,7 +1031,7 @@ label {
 .mission-input {
   min-width: 0;
   display: grid;
-  grid-template-columns: auto minmax(160px, 220px) minmax(280px, 1fr);
+  grid-template-columns: auto minmax(180px, 260px) minmax(0, 1fr);
   gap: 8px;
   align-items: center;
 }
@@ -987,34 +1047,46 @@ label {
 }
 
 .mission-input textarea {
-  min-height: 42px;
-  max-height: 120px;
+  min-height: 40px;
+  max-height: 92px;
 }
 
 .mission-options {
   min-width: 0;
   display: grid;
-  grid-template-columns:
-    minmax(104px, 0.76fr)
-    minmax(104px, 0.76fr)
-    minmax(188px, 1.35fr)
-    minmax(126px, 0.9fr)
-    minmax(136px, 1fr)
-    auto
-    auto;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
   align-items: center;
+}
+
+.mission-selects {
+  min-width: 0;
+  display: grid;
+  grid-template-columns:
+    minmax(118px, 0.8fr)
+    minmax(118px, 0.8fr)
+    minmax(240px, 1.5fr)
+    minmax(140px, 0.9fr)
+    minmax(150px, 1fr);
+  gap: 8px;
+}
+
+.mission-actions {
+  display: grid;
+  grid-template-columns: minmax(88px, auto) minmax(96px, auto);
+  gap: 8px;
 }
 
 .mission-options select,
 .mission-options input,
 .mission-options button,
 .attach-control {
-  min-height: 40px;
+  min-height: 38px;
 }
 
 .attach-control {
-  padding: 0 13px;
+  min-width: 88px;
+  padding: 0 12px;
   border-style: solid;
   font-size: 12px;
   font-weight: 760;
@@ -1052,8 +1124,13 @@ label {
 
   .mission-bar form,
   .mission-input,
-  .mission-options {
+  .mission-options,
+  .mission-selects {
     grid-template-columns: 1fr;
+  }
+
+  .mission-actions {
+    grid-template-columns: 1fr 1fr;
   }
 }
 
@@ -1084,6 +1161,15 @@ label {
 
   .node-flow {
     padding-inline: 8px;
+  }
+
+  .canvas-toolbar {
+    grid-template-columns: 1fr;
+    justify-content: stretch;
+  }
+
+  .canvas-zoom {
+    justify-self: start;
   }
 
   .mission-bar {
