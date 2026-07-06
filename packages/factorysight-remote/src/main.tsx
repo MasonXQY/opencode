@@ -363,9 +363,7 @@ function Workspace(props: {
               <strong>{counts().failed}</strong>
               Failed
             </span>
-            <Show when={freshestTask()}>
-              {(task) => <small>Last update: {task().title}</small>}
-            </Show>
+            <Show when={freshestTask()}>{(task) => <small>Last update: {task().title}</small>}</Show>
             <small>Backend: {props.data.backendMode === "factorysight" ? "FactorySight" : "Local dev"}</small>
           </div>
         </div>
@@ -410,11 +408,18 @@ function Workspace(props: {
           />
           <ProjectFilesPanel
             project={activeProject()}
-            files={props.data.files.filter((file) => file.projectId === activeProject()?.id && file.scope === "project")}
+            files={props.data.files.filter(
+              (file) => file.projectId === activeProject()?.id && file.scope === "project",
+            )}
             api={props.api}
             onChanged={props.onRefresh}
           />
-          <TaskList data={props.data} tasks={projectTasks()} selected={props.selectedTaskId} onSelect={props.onSelectTask} />
+          <TaskList
+            data={props.data}
+            tasks={projectTasks()}
+            selected={props.selectedTaskId}
+            onSelect={props.onSelectTask}
+          />
           <TaskForm
             data={props.data}
             api={props.api}
@@ -495,11 +500,11 @@ function ProjectTaskManager(props: {
         return [task.title, task.prompt, task.agent, task.model, task.status].join(" ").toLowerCase().includes(q)
       })
   })
-  const activeTaskCount = createMemo(() =>
-    props.data.tasks.filter((task) => task.projectId === projectId() && task.status !== "archived").length,
+  const activeTaskCount = createMemo(
+    () => props.data.tasks.filter((task) => task.projectId === projectId() && task.status !== "archived").length,
   )
-  const archivedTaskCount = createMemo(() =>
-    props.data.tasks.filter((task) => task.projectId === projectId() && task.status === "archived").length,
+  const archivedTaskCount = createMemo(
+    () => props.data.tasks.filter((task) => task.projectId === projectId() && task.status === "archived").length,
   )
   const pendingProjectId = createMemo(() => {
     const target = pendingDelete()
@@ -569,7 +574,9 @@ function ProjectTaskManager(props: {
             </div>
             <For each={props.data.projects}>
               {(project) => {
-                const count = props.data.tasks.filter((task) => task.projectId === project.id && task.status !== "archived").length
+                const count = props.data.tasks.filter(
+                  (task) => task.projectId === project.id && task.status !== "archived",
+                ).length
                 return (
                   <div class="manager-project-row" classList={{ active: project.id === projectId() }}>
                     <button
@@ -594,7 +601,11 @@ function ProjectTaskManager(props: {
                         }
                       }}
                     >
-                      {busyProjectId() === project.id ? "Deleting..." : pendingProjectId() === project.id ? "Confirm delete" : "Delete"}
+                      {busyProjectId() === project.id
+                        ? "Deleting..."
+                        : pendingProjectId() === project.id
+                          ? "Confirm delete"
+                          : "Delete"}
                     </button>
                     <Show when={pendingProjectId() === project.id}>
                       <span class="manager-pending-note project">Click again to delete project and tasks.</span>
@@ -609,9 +620,7 @@ function ProjectTaskManager(props: {
           </aside>
 
           <section class="manager-tasks">
-            <Show when={managerError()}>
-              {(message) => <div class="manager-error">{message()}</div>}
-            </Show>
+            <Show when={managerError()}>{(message) => <div class="manager-error">{message()}</div>}</Show>
             <div class="manager-toolbar">
               <div>
                 <h2>{selectedProject()?.name ?? "No project"}</h2>
@@ -625,7 +634,10 @@ function ProjectTaskManager(props: {
             <div class="manager-controls">
               <label>
                 Status
-                <select value={status()} onChange={(event) => setStatus(event.currentTarget.value as ManagerStatusFilter)}>
+                <select
+                  value={status()}
+                  onChange={(event) => setStatus(event.currentTarget.value as ManagerStatusFilter)}
+                >
                   <option value="active">Active</option>
                   <option value="running">Running</option>
                   <option value="completed">Completed</option>
@@ -669,7 +681,11 @@ function ProjectTaskManager(props: {
                         disabled={task.status === "archived" || busyTaskId() === task.id}
                         onClick={() => archive(task)}
                       >
-                        {task.status === "archived" ? "Archived" : busyTaskId() === task.id ? "Archiving..." : "Archive"}
+                        {task.status === "archived"
+                          ? "Archived"
+                          : busyTaskId() === task.id
+                            ? "Archiving..."
+                            : "Archive"}
                       </button>
                       <button
                         class="danger"
@@ -683,7 +699,11 @@ function ProjectTaskManager(props: {
                           }
                         }}
                       >
-                        {busyTaskId() === task.id ? "Deleting..." : pendingTaskId() === task.id ? "Confirm delete" : "Delete"}
+                        {busyTaskId() === task.id
+                          ? "Deleting..."
+                          : pendingTaskId() === task.id
+                            ? "Confirm delete"
+                            : "Delete"}
                       </button>
                       <Show when={pendingTaskId() === task.id}>
                         <span class="manager-pending-note">Click again to delete permanently.</span>
@@ -708,7 +728,13 @@ function DesignLibrarySwitcher(props: { value: DesignThemeId; onChange: (theme: 
   const active = createMemo(() => designThemes.find((theme) => theme.id === props.value) ?? designThemes[0])
   return (
     <div class="design-control">
-      <button class="design-button" type="button" aria-haspopup="menu" aria-expanded={open()} onClick={() => setOpen(!open())}>
+      <button
+        class="design-button"
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open()}
+        onClick={() => setOpen(!open())}
+      >
         <span>Style</span>
         <strong>{active().name}</strong>
       </button>
@@ -780,8 +806,8 @@ function PermissionSwitcher(props: {
 }) {
   const [open, setOpen] = createSignal(false)
   const [busy, setBusy] = createSignal(false)
-  const active = createMemo(() =>
-    props.profiles.find((profile) => profile.id === props.project?.permissionLevel) ?? props.profiles[0],
+  const active = createMemo(
+    () => props.profiles.find((profile) => profile.id === props.project?.permissionLevel) ?? props.profiles[0],
   )
 
   async function setLevel(level: PermissionLevel) {
@@ -824,7 +850,11 @@ function PermissionSwitcher(props: {
   )
 }
 
-function ProjectForm(props: { data: BootstrapData; api: ApiClient; onCreated: (projectId: string) => void | Promise<void> }) {
+function ProjectForm(props: {
+  data: BootstrapData
+  api: ApiClient
+  onCreated: (projectId: string) => void | Promise<void>
+}) {
   const [open, setOpen] = createSignal(props.data.projects.length === 0)
   const projectSuffix = Math.random().toString(36).slice(2, 8)
   const [name, setName] = createSignal("FactorySight")
@@ -907,7 +937,11 @@ function ProjectFilesPanel(props: {
       >
         <label class="file-picker">
           <span>{selectedFiles().length ? `${selectedFiles().length} selected` : "Upload project files"}</span>
-          <input type="file" multiple onChange={(event) => setSelectedFiles(Array.from(event.currentTarget.files ?? []))} />
+          <input
+            type="file"
+            multiple
+            onChange={(event) => setSelectedFiles(Array.from(event.currentTarget.files ?? []))}
+          />
         </label>
         <button disabled={busy() || !props.project || selectedFiles().length === 0}>
           {busy() ? "Uploading..." : "Upload"}
@@ -917,7 +951,11 @@ function ProjectFilesPanel(props: {
         <div class="file-list">
           <For each={props.files}>
             {(file) => (
-              <button type="button" class="file-link" onClick={() => (window.location.href = props.api.projectFileUrl(file.projectId, file.id))}>
+              <button
+                type="button"
+                class="file-link"
+                onClick={() => (window.location.href = props.api.projectFileUrl(file.projectId, file.id))}
+              >
                 <span>
                   <strong>{file.originalName}</strong>
                   <small>{file.relativePath}</small>
@@ -932,7 +970,12 @@ function ProjectFilesPanel(props: {
   )
 }
 
-function TaskForm(props: { data: BootstrapData; api: ApiClient; activeProjectId: string | undefined; onCreated: (taskId: string) => void | Promise<void> }) {
+function TaskForm(props: {
+  data: BootstrapData
+  api: ApiClient
+  activeProjectId: string | undefined
+  onCreated: (taskId: string) => void | Promise<void>
+}) {
   const [mode, setMode] = createSignal<"single" | "team">("team")
   const [scale, setScale] = createSignal<"focused" | "balanced" | "wide">("balanced")
   const [projectId, setProjectId] = createSignal(props.activeProjectId ?? "")
@@ -940,7 +983,9 @@ function TaskForm(props: { data: BootstrapData; api: ApiClient; activeProjectId:
   const [prompt, setPrompt] = createSignal("")
   const [agent, setAgent] = createSignal("build")
   const [model, setModel] = createSignal(
-    props.data.models.includes(preferredDefaultModel) ? preferredDefaultModel : (props.data.models[0] ?? preferredDefaultModel),
+    props.data.models.includes(preferredDefaultModel)
+      ? preferredDefaultModel
+      : (props.data.models[0] ?? preferredDefaultModel),
   )
   const [modelQuery, setModelQuery] = createSignal("")
   const [collaboration, setCollaboration] = createSignal<"private" | "project" | "shared">("project")
@@ -1003,7 +1048,7 @@ function TaskForm(props: { data: BootstrapData; api: ApiClient; activeProjectId:
           setFiles([])
           await props.onCreated(task.id)
         }}
-        >
+      >
         <div class="mode-cards">
           <button type="button" classList={{ active: mode() === "team" }} onClick={() => setMode("team")}>
             <strong>Agent Swarm</strong>
@@ -1017,7 +1062,11 @@ function TaskForm(props: { data: BootstrapData; api: ApiClient; activeProjectId:
         <input type="hidden" value={projectId()} />
         <label>
           Title
-          <input value={title()} onInput={(event) => setTitle(event.currentTarget.value)} placeholder="Fix auth redirect" />
+          <input
+            value={title()}
+            onInput={(event) => setTitle(event.currentTarget.value)}
+            placeholder="Fix auth redirect"
+          />
         </label>
         <label>
           Mission
@@ -1049,7 +1098,9 @@ function TaskForm(props: { data: BootstrapData; api: ApiClient; activeProjectId:
         <details class="advanced-config">
           <summary>
             <span>Advanced routing</span>
-            <small>{model()} · {collaboration()}</small>
+            <small>
+              {model()} · {collaboration()}
+            </small>
           </summary>
           <div class="advanced-config-body">
             <Show when={mode() === "team"}>
@@ -1058,7 +1109,11 @@ function TaskForm(props: { data: BootstrapData; api: ApiClient; activeProjectId:
                   Focused
                   <span>3-4 agents</span>
                 </button>
-                <button type="button" classList={{ active: scale() === "balanced" }} onClick={() => setScale("balanced")}>
+                <button
+                  type="button"
+                  classList={{ active: scale() === "balanced" }}
+                  onClick={() => setScale("balanced")}
+                >
                   Balanced
                   <span>Up to 8 agents</span>
                 </button>
@@ -1152,7 +1207,12 @@ function TaskForm(props: { data: BootstrapData; api: ApiClient; activeProjectId:
   )
 }
 
-function TaskList(props: { data: BootstrapData; tasks: Task[]; selected: string | undefined; onSelect: (id: string) => void }) {
+function TaskList(props: {
+  data: BootstrapData
+  tasks: Task[]
+  selected: string | undefined
+  onSelect: (id: string) => void
+}) {
   const counts = createMemo(() => taskCounts(props.tasks))
   return (
     <section class="panel task-list">
@@ -1176,14 +1236,20 @@ function TaskList(props: { data: BootstrapData; tasks: Task[]; selected: string 
       >
         <For each={props.tasks}>
           {(task) => (
-            <button class="task-card" classList={{ active: props.selected === task.id }} onClick={() => props.onSelect(task.id)}>
+            <button
+              class="task-card"
+              classList={{ active: props.selected === task.id }}
+              onClick={() => props.onSelect(task.id)}
+            >
               <div class="task-card-top">
                 <strong>{task.title}</strong>
                 <span class={`status ${task.status}`}>{statusLabel(task.status)}</span>
               </div>
-              <small>{taskStage(task)} · {time(task.updatedAt)}</small>
+              <small>
+                {taskStage(task)} task · updated {time(task.updatedAt)}
+              </small>
               <div class="task-assignee">
-                <span>Assigned to</span>
+                <span>Role</span>
                 <AgentAvatar data={props.data} agent={task.agent} compact />
               </div>
             </button>
@@ -1204,7 +1270,9 @@ function TaskDetail(props: {
 }) {
   const [events, setEvents] = createSignal<TaskEvent[]>(props.task.events)
   const [message, setMessage] = createSignal("")
-  const [shareUser, setShareUser] = createSignal(props.data.users.find((user) => user.id !== props.data.user.id)?.id ?? "")
+  const [shareUser, setShareUser] = createSignal(
+    props.data.users.find((user) => user.id !== props.data.user.id)?.id ?? "",
+  )
   const childTasks = createMemo(() => props.data.tasks.filter((task) => task.parentTaskId === props.task.id))
   const parentTask = createMemo(() => props.data.tasks.find((task) => task.id === props.task.parentTaskId))
   const chainRoot = createMemo(() => parentTask() ?? props.task)
@@ -1276,23 +1344,7 @@ function TaskDetail(props: {
             onSelectTask={props.onTaskChanged}
           />
 
-          <section class="timeline">
-            <div class="section-heading">
-              <h2>Detailed timeline</h2>
-              <span>{events().length} events</span>
-            </div>
-            <For each={events()}>
-              {(event) => (
-                <div class={`event event-${event.type}`}>
-                  <div class="event-meta">
-                    <span>{event.type}</span>
-                    <time>{time(event.at)}</time>
-                  </div>
-                  <pre>{event.text}</pre>
-                </div>
-              )}
-            </For>
-          </section>
+          <TaskTimeline events={events()} />
 
           <section class="composer-row">
             <form
@@ -1337,7 +1389,9 @@ function TaskDetail(props: {
             <AgentAvatar data={props.data} agent={props.task.agent} />
             <p>{currentProfile()?.summary ?? "Working on this task."}</p>
             <Show when={props.task.kind === "orchestration"}>
-              <div class="context-note">Coordinator keeps global context clean; sub-agents work in isolated context shards.</div>
+              <div class="context-note">
+                Coordinator keeps global context clean; sub-agents work in isolated context shards.
+              </div>
             </Show>
           </div>
 
@@ -1360,6 +1414,37 @@ function TaskDetail(props: {
   )
 }
 
+function TaskTimeline(props: { events: TaskEvent[] }) {
+  const [expanded, setExpanded] = createSignal(false)
+  const visibleEvents = createMemo(() => (expanded() ? props.events : props.events.slice(-8)))
+  return (
+    <section class="timeline">
+      <div class="section-heading">
+        <div>
+          <h2>Timeline</h2>
+          <p>{expanded() ? "Full task history" : "Latest task activity"}</p>
+        </div>
+        <button class="ghost mini" type="button" onClick={() => setExpanded(!expanded())}>
+          {expanded() ? "Collapse" : `${props.events.length} events`}
+        </button>
+      </div>
+      <div class="timeline-scroll">
+        <For each={visibleEvents()}>
+          {(event) => (
+            <div class={`event event-${event.type}`}>
+              <div class="event-meta">
+                <span>{event.type}</span>
+                <time>{time(event.at)}</time>
+              </div>
+              <pre>{event.text}</pre>
+            </div>
+          )}
+        </For>
+      </div>
+    </section>
+  )
+}
+
 function TaskChainNav(props: {
   data: BootstrapData
   currentTaskId: string
@@ -1367,7 +1452,12 @@ function TaskChainNav(props: {
   onSelectTask: (id: string) => void
 }) {
   const percent = createMemo(() => progressValue(props.tasks))
-  const currentIndex = createMemo(() => Math.max(0, props.tasks.findIndex((task) => task.id === props.currentTaskId)))
+  const currentIndex = createMemo(() =>
+    Math.max(
+      0,
+      props.tasks.findIndex((task) => task.id === props.currentTaskId),
+    ),
+  )
   const activeTask = createMemo(() => props.tasks[currentIndex()])
   return (
     <section class="chain-nav">
@@ -1394,7 +1484,11 @@ function TaskChainNav(props: {
               <span class={`chain-index ${task.status}`}>{index() + 1}</span>
               <AgentAvatar data={props.data} agent={task.agent} compact />
               <div>
-                <strong>{task.kind === "orchestration" ? "Coordinator" : props.data.agentProfiles[task.agent]?.name ?? task.agent}</strong>
+                <strong>
+                  {task.kind === "orchestration"
+                    ? "Coordinator"
+                    : (props.data.agentProfiles[task.agent]?.name ?? task.agent)}
+                </strong>
                 <small>{task.title}</small>
               </div>
               <span class={`status ${task.status}`}>{statusLabel(task.status)}</span>
@@ -1422,30 +1516,58 @@ function ResultPanel(props: {
   const isDone = createMemo(() => ["completed", "failed", "archived"].includes(props.task.status))
   const projectArtifacts = createMemo(() => artifactsForProject(props.data.artifacts, props.activeProjectId))
   const taskFiles = createMemo(() => props.data.files.filter((file) => file.taskId === props.task.id))
+  const [activeView, setActiveView] = createSignal<"overview" | "artifacts" | "output">("overview")
+  const artifactsCount = createMemo(() => projectArtifacts().length + taskFiles().length)
+  const outputCount = createMemo(() => digest().deliverables.length + runnerPreview().length + digest().errors.length)
 
   return (
     <section class="result-panel">
       <div class="section-heading">
-        <h2>Result</h2>
+        <div>
+          <h2>Result</h2>
+          <p>{isDone() ? "Final task state" : "Live task state"}</p>
+        </div>
         <span>{isDone() ? "final" : "live"}</span>
       </div>
 
-      <div class="result-grid">
-        <div class={`result-metric status-${props.task.status}`}>
-          <strong>{statusLabel(props.task.status)}</strong>
-          <span>Task status</span>
-        </div>
-        <div class="result-metric">
-          <strong>{props.childTasks.length || 1}</strong>
-          <span>{props.childTasks.length ? "Agents" : "Agent"}</span>
-        </div>
-        <div class="result-metric" classList={{ danger: digest().errors.length > 0 }}>
-          <strong>{digest().errors.length}</strong>
-          <span>Errors</span>
-        </div>
+      <div class="result-tabs" role="tablist" aria-label="Task result views">
+        <button
+          classList={{ active: activeView() === "overview" }}
+          type="button"
+          onClick={() => setActiveView("overview")}
+        >
+          Overview
+        </button>
+        <button
+          classList={{ active: activeView() === "artifacts" }}
+          type="button"
+          onClick={() => setActiveView("artifacts")}
+        >
+          Artifacts <span>{artifactsCount()}</span>
+        </button>
+        <button classList={{ active: activeView() === "output" }} type="button" onClick={() => setActiveView("output")}>
+          Output <span>{outputCount()}</span>
+        </button>
       </div>
 
-      <Show when={projectArtifacts().length > 0}>
+      <Show when={activeView() === "overview"}>
+        <div class="result-grid">
+          <div class={`result-metric status-${props.task.status}`}>
+            <strong>{statusLabel(props.task.status)}</strong>
+            <span>Task status</span>
+          </div>
+          <div class="result-metric">
+            <strong>{props.childTasks.length || 1}</strong>
+            <span>{props.childTasks.length ? "Agents" : "Agent"}</span>
+          </div>
+          <div class="result-metric" classList={{ danger: digest().errors.length > 0 }}>
+            <strong>{digest().errors.length}</strong>
+            <span>Errors</span>
+          </div>
+        </div>
+      </Show>
+
+      <Show when={activeView() === "artifacts" && projectArtifacts().length > 0}>
         <div class="artifact-list">
           <div class="section-heading">
             <h2>Artifacts</h2>
@@ -1471,7 +1593,7 @@ function ResultPanel(props: {
         </div>
       </Show>
 
-      <Show when={taskFiles().length > 0}>
+      <Show when={activeView() === "artifacts" && taskFiles().length > 0}>
         <div class="file-list">
           <div class="section-heading">
             <h2>Task files</h2>
@@ -1479,7 +1601,11 @@ function ResultPanel(props: {
           </div>
           <For each={taskFiles()}>
             {(file) => (
-              <button type="button" class="file-link" onClick={() => (window.location.href = props.api.projectFileUrl(file.projectId, file.id))}>
+              <button
+                type="button"
+                class="file-link"
+                onClick={() => (window.location.href = props.api.projectFileUrl(file.projectId, file.id))}
+              >
                 <span>
                   <strong>{file.originalName}</strong>
                   <small>{file.relativePath}</small>
@@ -1491,18 +1617,26 @@ function ResultPanel(props: {
         </div>
       </Show>
 
+      <Show when={activeView() === "artifacts" && artifactsCount() === 0} fallback={null}>
+        <p class="result-empty">No artifacts or task files are available for this task yet.</p>
+      </Show>
+
       <Show
-        when={digest().deliverables.at(-1) || digest().lastStatus || digest().lastOutput}
-        fallback={<p class="result-empty">No runner output yet. The result will appear here as soon as the task reports progress.</p>}
+        when={activeView() === "output" && (digest().deliverables.at(-1) || digest().lastStatus || digest().lastOutput)}
+        fallback={
+          <Show when={activeView() === "output"}>
+            <p class="result-empty">
+              No runner output yet. The result will appear here as soon as the task reports progress.
+            </p>
+          </Show>
+        }
       >
         <div class="result-summary">
           <div class="section-heading">
             <h2>Run log</h2>
             <span>scroll</span>
           </div>
-          <Show when={digest().deliverables.at(-1)}>
-            {(event) => <pre>{event().text}</pre>}
-          </Show>
+          <Show when={digest().deliverables.at(-1)}>{(event) => <pre>{event().text}</pre>}</Show>
           <Show when={digest().lastStatus}>
             <p>{digest().lastStatus}</p>
           </Show>
@@ -1512,7 +1646,11 @@ function ResultPanel(props: {
         </div>
       </Show>
 
-      <Show when={props.childTasks.some((task) => eventDigest(task.events).deliverables.length > 0)}>
+      <Show
+        when={
+          activeView() === "output" && props.childTasks.some((task) => eventDigest(task.events).deliverables.length > 0)
+        }
+      >
         <div class="deliverables-list">
           <div class="section-heading">
             <h2>Deliverables</h2>
@@ -1532,14 +1670,14 @@ function ResultPanel(props: {
         </div>
       </Show>
 
-      <Show when={digest().errors.length > 0}>
+      <Show when={activeView() === "output" && digest().errors.length > 0}>
         <div class="result-errors">
           <h3>Errors</h3>
           <For each={digest().errors.slice(-3)}>{(event) => <pre>{event.text}</pre>}</For>
         </div>
       </Show>
 
-      <Show when={props.childTasks.length > 0}>
+      <Show when={activeView() === "overview" && props.childTasks.length > 0}>
         <div class="agent-results">
           <div class="section-heading">
             <h2>Agent outputs</h2>
@@ -1565,7 +1703,7 @@ function ResultPanel(props: {
         </div>
       </Show>
 
-      <Show when={runnerPreview().length > 1 && props.childTasks.length === 0}>
+      <Show when={activeView() === "output" && runnerPreview().length > 1 && props.childTasks.length === 0}>
         <div class="runner-preview">
           <div class="section-heading">
             <h2>Recent output</h2>

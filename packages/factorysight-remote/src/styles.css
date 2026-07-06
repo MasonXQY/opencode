@@ -1,6 +1,13 @@
 :root {
   color-scheme: light;
-  font-family: "Noto Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:
+    "Noto Sans",
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
 
   --presight-color-blue-25: #f5f8ff;
   --presight-color-blue-50: #f2f7fc;
@@ -234,9 +241,7 @@
 body {
   margin: 0;
   min-width: 320px;
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.56), transparent 220px),
-    var(--factory-bg);
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.56), transparent 220px), var(--factory-bg);
 }
 
 :root[data-theme="linear"] body,
@@ -1067,7 +1072,7 @@ h3 {
 
 .workspace-grid {
   display: grid;
-  grid-template-columns: minmax(292px, 344px) minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 336px) minmax(0, 1fr);
   height: 100%;
   min-height: 0;
   overflow: hidden;
@@ -1624,12 +1629,12 @@ h3 {
 
 .task-detail {
   width: 100%;
-  max-width: 1200px;
+  max-width: none;
   min-height: 100%;
   display: grid;
   gap: 16px;
-  padding: 18px;
-  margin: 0 auto;
+  padding: 16px;
+  margin: 0;
 }
 
 .detail-header {
@@ -1655,9 +1660,10 @@ h3 {
 
 .task-layout {
   min-width: 0;
+  min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 820px) minmax(256px, 300px);
-  justify-content: center;
+  grid-template-columns: minmax(0, 1fr) minmax(264px, 316px);
+  justify-content: stretch;
   align-items: start;
   gap: 16px;
 }
@@ -1665,6 +1671,7 @@ h3 {
 .task-main,
 .task-aside {
   min-width: 0;
+  min-height: 0;
   display: grid;
   align-content: start;
   gap: 14px;
@@ -1901,21 +1908,43 @@ h3 {
   display: grid;
   align-content: start;
   gap: 8px;
-  max-height: min(52vh, 560px);
-  overflow: auto;
+  max-height: min(44vh, 460px);
+  overflow: hidden;
   overscroll-behavior: contain;
   padding: 14px;
   scrollbar-width: thin;
   scrollbar-color: var(--presight-color-gray-300) transparent;
 }
 
-.timeline > .section-heading {
-  position: sticky;
-  top: -14px;
-  z-index: 1;
-  padding: 0 0 10px;
-  background: var(--factory-surface);
+.timeline .section-heading {
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--presight-color-gray-200);
+}
+
+.timeline .section-heading > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.section-heading p {
+  margin: 0;
+  color: var(--presight-color-gray-500);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.timeline-scroll {
+  min-height: 0;
+  max-height: min(34vh, 340px);
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--presight-color-gray-300) transparent;
 }
 
 .result-panel {
@@ -1924,6 +1953,52 @@ h3 {
   align-content: start;
   padding: 14px;
   border-color: var(--presight-color-gray-200);
+}
+
+.result-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--presight-color-gray-200);
+  border-radius: var(--presight-radius-md);
+  background: var(--factory-surface-muted);
+}
+
+.result-tabs button {
+  min-width: 0;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--presight-color-gray-500);
+  box-shadow: none;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 800;
+}
+
+.result-tabs button.active {
+  background: var(--factory-surface);
+  color: var(--presight-color-gray-900);
+  border-color: var(--presight-color-gray-200);
+}
+
+.result-tabs span {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--presight-color-gray-100);
+  color: var(--presight-color-gray-600);
+  font-size: 11px;
+  line-height: 14px;
 }
 
 .result-grid {
@@ -2420,6 +2495,108 @@ h3 {
 :root[data-theme="linear"] .file-link strong,
 :root[data-theme="linear"] .workspace-summary strong {
   color: var(--presight-color-gray-900);
+}
+
+:root[data-theme="linear"] .app-shell {
+  width: min(1520px, calc(100vw - 48px));
+  height: calc(100vh - 48px);
+  margin: 24px auto;
+  border-color: #24262d;
+  background: #090a0c;
+}
+
+:root[data-theme="linear"] .topbar {
+  min-height: 64px;
+  background: #0b0c0f;
+}
+
+:root[data-theme="linear"] .sidebar {
+  background: #0a0b0d;
+}
+
+:root[data-theme="linear"] .detail {
+  background: #060709;
+}
+
+:root[data-theme="linear"] .detail-header,
+:root[data-theme="linear"] .panel,
+:root[data-theme="linear"] .result-panel,
+:root[data-theme="linear"] .agent-stage,
+:root[data-theme="linear"] .linked-tasks,
+:root[data-theme="linear"] .swarm-panel,
+:root[data-theme="linear"] .timeline,
+:root[data-theme="linear"] .chain-nav,
+:root[data-theme="linear"] .event,
+:root[data-theme="linear"] .product-style-panel,
+:root[data-theme="linear"] .advanced-config,
+:root[data-theme="linear"] .result-metric,
+:root[data-theme="linear"] .artifact-link,
+:root[data-theme="linear"] .file-link,
+:root[data-theme="linear"] .file-picker,
+:root[data-theme="linear"] .result-tabs,
+:root[data-theme="linear"] .result-tabs button.active,
+:root[data-theme="linear"] .context-note {
+  background: #101114;
+  border-color: #25272e;
+}
+
+:root[data-theme="linear"] .result-tabs {
+  background: #08090b;
+}
+
+:root[data-theme="linear"] .result-tabs button {
+  color: #8d929c;
+}
+
+:root[data-theme="linear"] .result-tabs button.active {
+  color: #f4f5f8;
+}
+
+:root[data-theme="linear"] .project-picker button.active,
+:root[data-theme="linear"] .task-card.active,
+:root[data-theme="linear"] .mode-cards button.active,
+:root[data-theme="linear"] .scale-row button.active,
+:root[data-theme="linear"] .chain-step.active {
+  background: #141620;
+  border-color: #5e6ad2;
+  box-shadow: inset 3px 0 0 #7c86ff;
+}
+
+:root[data-theme="linear"] .result-summary pre,
+:root[data-theme="linear"] .result-errors pre,
+:root[data-theme="linear"] .runner-preview pre,
+:root[data-theme="linear"] .deliverable-card pre,
+:root[data-theme="linear"] .event pre {
+  background: #08090b;
+  border-color: #25272e;
+  color: #d9dee7;
+}
+
+:root[data-theme="linear"] .result-metric.status-completed {
+  background: #0d2114;
+  border-color: #1f5f34;
+}
+
+:root[data-theme="linear"] .result-metric.status-running {
+  background: #11142d;
+  border-color: #3f4798;
+}
+
+:root[data-theme="linear"] .result-metric.status-failed,
+:root[data-theme="linear"] .result-metric.danger {
+  background: #2a1115;
+  border-color: #6f2a36;
+}
+
+:root[data-theme="linear"] .composer-row,
+:root[data-theme="linear"] .share-row {
+  padding: 0;
+}
+
+.mini {
+  min-height: 30px;
+  padding: 5px 9px;
+  font-size: 12px;
 }
 
 @media (max-width: 980px) {
