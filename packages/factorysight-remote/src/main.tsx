@@ -42,6 +42,10 @@ type FlowNode = {
   meta?: string
   previews?: FlowPreview[]
 }
+type NodePosition = {
+  x: number
+  y: number
+}
 type FlowEdge = {
   id: string
   from: FlowNode
@@ -302,6 +306,25 @@ function buildProjectFlow(input: {
     edges,
     width: outputX + nodeWidth + canvasPad,
     height: graphHeight,
+  }
+}
+
+function applyNodePositions(flow: ProjectFlow, positions: Record<string, NodePosition>): ProjectFlow {
+  const nodes = flow.nodes.map((node) => {
+    const position = positions[node.id]
+    return position ? { ...node, x: position.x, y: position.y } : node
+  })
+  const byId = new Map(nodes.map((node) => [node.id, node]))
+  return {
+    ...flow,
+    nodes,
+    edges: flow.edges
+      .map((edge) => {
+        const from = byId.get(edge.from.id)
+        const to = byId.get(edge.to.id)
+        return from && to ? { ...edge, from, to } : undefined
+      })
+      .filter((edge): edge is FlowEdge => Boolean(edge)),
   }
 }
 
@@ -963,13 +986,14 @@ function WorkflowCanvas(props: {
   counts: ReturnType<typeof taskCounts>
   artifacts: Artifact[]
   files: FileAttachment[]
-  onSelectTask: (id: string) => void
+  onSelectTask: (id: string | undefined) => void
   onRefresh: () => void
   onStartWorkflow: () => void
 }) {
   let nodeViewport: HTMLDivElement | undefined
+  let positionedProjectId: string | undefined
   const percent = createMemo(() => progressValue(props.chainTasks.length ? props.chainTasks : props.tasks))
-  const flow = createMemo(() =>
+  const baseFlow = createMemo(() =>
     buildProjectFlow({
       project: props.project,
       tasks: props.tasks,
@@ -980,9 +1004,59 @@ function WorkflowCanvas(props: {
       fileUrl: (file) => props.api.projectFileUrl(file.projectId, file.id),
     }),
   )
+  const [manualPositions, setManualPositions] = createSignal<Record<string, NodePosition>>({})
+  const [nodeActionBusy, setNodeActionBusy] = createSignal<string | undefined>()
+  const flow = createMemo(() => applyNodePositions(baseFlow(), manualPositions()))
   const [zoom, setZoom] = createSignal(1)
   const zoomLabel = createMemo(() => `${Math.round(zoom() * 100)}%`)
   const updateZoom = (delta: number) => setZoom((value) => Math.min(1.28, Math.max(0.72, value + delta)))
+  const taskById = createMemo(() => new Map(props.tasks.map((task) => [task.id, task])))
+  const moveNode = (nodeId: string, position: NodePosition) => {
+    setManualPositions((current) => ({
+      ...current,
+      [nodeId]: {
+        x: Math.max(12, Math.round(position.x)),
+        y: Math.max(12, Math.round(position.y)),
+      },
+    }))
+  }
+  const duplicateNode = async (node: FlowNode) => {
+    if (!node.taskId) return
+    const task = taskById().get(node.taskId)
+    if (!task) return
+    setNodeActionBusy(`duplicate:${node.id}`)
+    try {
+      const created = await props.api.createTask({
+        projectId: task.projectId,
+        title: `${task.title} copy`,
+        prompt: task.prompt,
+        agent: task.agent,
+        model: task.model,
+        collaboration: task.collaboration,
+      })
+      await props.onRefresh()
+      props.onSelectTask(created.id)
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : String(error))
+    } finally {
+      setNodeActionBusy(undefined)
+    }
+  }
+  const deleteNode = async (node: FlowNode) => {
+    if (!node.taskId) return
+    const confirmed = window.confirm(`Delete "${node.title}"? This also removes its child tasks and task files.`)
+    if (!confirmed) return
+    setNodeActionBusy(`delete:${node.id}`)
+    try {
+      await props.api.deleteTask(node.taskId)
+      if (props.selectedTaskId === node.taskId) props.onSelectTask(undefined)
+      await props.onRefresh()
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : String(error))
+    } finally {
+      setNodeActionBusy(undefined)
+    }
+  }
   const focusSelectedNode = () =>
     requestAnimationFrame(() => {
       nodeViewport
@@ -996,12 +1070,20 @@ function WorkflowCanvas(props: {
   }
   const autoLayout = () => {
     const nextZoom = flow().width > 1500 || flow().height > 740 ? 0.72 : 0.86
+    setManualPositions({})
     setZoom(nextZoom)
     requestAnimationFrame(() => nodeViewport?.scrollTo({ left: 0, top: 0, behavior: "smooth" }))
   }
 
   createEffect(() => {
-    const current = flow()
+    const projectId = props.project?.id
+    if (projectId === positionedProjectId) return
+    positionedProjectId = projectId
+    setManualPositions({})
+  })
+
+  createEffect(() => {
+    const current = baseFlow()
     setZoom(current.width > 1500 || current.height > 740 ? 0.72 : 0.86)
     requestAnimationFrame(() => nodeViewport?.scrollTo({ left: 0, top: 0 }))
   })
@@ -1078,17 +1160,16 @@ function WorkflowCanvas(props: {
                 node={node}
                 index={index() + 1}
                 selected={node.taskId === props.selectedTaskId}
+                zoom={zoom()}
+                actionBusy={nodeActionBusy()}
                 onSelect={() => node.taskId && props.onSelectTask(node.taskId)}
+                onMove={moveNode}
+                onDuplicate={duplicateNode}
+                onDelete={deleteNode}
               />
             )}
           </For>
         </div>
-      </div>
-      <div class="canvas-footer">
-        <span>{props.counts.running} running</span>
-        <span>{props.counts.queued} queued</span>
-        <span>{props.counts.completed} completed</span>
-        <span>{props.counts.failed} failed</span>
       </div>
     </section>
   )
@@ -1149,12 +1230,49 @@ function FlowNodeCard(props: {
   node: FlowNode
   index: number
   selected: boolean
+  zoom: number
+  actionBusy: string | undefined
   onSelect: () => void
+  onMove: (nodeId: string, position: NodePosition) => void
+  onDuplicate: (node: FlowNode) => void | Promise<void>
+  onDelete: (node: FlowNode) => void | Promise<void>
 }) {
   const profile = createMemo(() => (props.node.agent ? props.data.agentProfiles[props.node.agent] : undefined))
+  let startX = 0
+  let startY = 0
+  let nodeStartX = 0
+  let nodeStartY = 0
+  let didDrag = false
+  let suppressClick = false
+  const actionDisabled = () => Boolean(props.actionBusy)
+  const beginDrag = (event: PointerEvent) => {
+    if (event.button !== 0) return
+    if ((event.target as HTMLElement).closest("button, a, input, textarea, select")) return
+    startX = event.clientX
+    startY = event.clientY
+    nodeStartX = props.node.x
+    nodeStartY = props.node.y
+    didDrag = false
+    ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+  }
+  const dragNode = (event: PointerEvent) => {
+    const target = event.currentTarget as HTMLElement
+    if (!target.hasPointerCapture(event.pointerId)) return
+    const deltaX = (event.clientX - startX) / props.zoom
+    const deltaY = (event.clientY - startY) / props.zoom
+    if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) didDrag = true
+    if (!didDrag) return
+    props.onMove(props.node.id, { x: nodeStartX + deltaX, y: nodeStartY + deltaY })
+  }
+  const endDrag = (event: PointerEvent) => {
+    const target = event.currentTarget as HTMLElement
+    if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId)
+    suppressClick = didDrag
+  }
   return (
-    <button
-      type="button"
+    <div
+      role={props.node.taskId ? "button" : "group"}
+      tabIndex={props.node.taskId ? 0 : undefined}
       class={`flow-node ${props.node.kind}`}
       classList={{
         selected: props.selected,
@@ -1164,8 +1282,53 @@ function FlowNodeCard(props: {
       }}
       style={{ left: `${props.node.x}px`, top: `${props.node.y}px` }}
       aria-disabled={!props.node.taskId}
-      onClick={props.onSelect}
+      onPointerDown={beginDrag}
+      onPointerMove={dragNode}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+      onClick={(event) => {
+        if (suppressClick) {
+          suppressClick = false
+          event.preventDefault()
+          return
+        }
+        props.onSelect()
+      }}
+      onKeyDown={(event) => {
+        if (!props.node.taskId) return
+        if (event.key !== "Enter" && event.key !== " ") return
+        event.preventDefault()
+        props.onSelect()
+      }}
     >
+      <Show when={props.selected && props.node.taskId}>
+        <div class="flow-node-actions" aria-label="Node actions">
+          <button
+            type="button"
+            class="flow-node-action"
+            aria-label="Duplicate node"
+            disabled={actionDisabled()}
+            onClick={(event) => {
+              event.stopPropagation()
+              void props.onDuplicate(props.node)
+            }}
+          >
+            ⧉
+          </button>
+          <button
+            type="button"
+            class="flow-node-action danger"
+            aria-label="Delete node"
+            disabled={actionDisabled()}
+            onClick={(event) => {
+              event.stopPropagation()
+              void props.onDelete(props.node)
+            }}
+          >
+            ×
+          </button>
+        </div>
+      </Show>
       <div class="flow-node-top">
         <span class="flow-node-index">
           {props.node.kind === "artifact" ? "OUT" : props.node.kind === "input" ? "IN" : props.index}
@@ -1232,7 +1395,7 @@ function FlowNodeCard(props: {
           {props.node.meta ?? statusLabel(props.node.status!)}
         </span>
       </Show>
-    </button>
+    </div>
   )
 }
 

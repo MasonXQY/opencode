@@ -886,14 +886,20 @@ label {
   color: var(--text);
   text-align: left;
   box-shadow: 0 10px 20px rgb(24 25 27 / 0.035);
+  cursor: grab;
+  user-select: none;
 }
 
 .flow-node:hover {
   box-shadow: 0 14px 34px rgb(24 25 27 / 0.09);
 }
 
+.flow-node:active {
+  cursor: grabbing;
+}
+
 .flow-node[aria-disabled="true"] {
-  cursor: default;
+  cursor: grab;
 }
 
 .flow-node.selected {
@@ -919,6 +925,37 @@ label {
 
 .flow-node.failed {
   border-color: rgb(217 75 95 / 0.52);
+}
+
+.flow-node-actions {
+  position: absolute;
+  top: 44px;
+  right: -31px;
+  z-index: 4;
+  display: grid;
+  gap: 3px;
+}
+
+.flow-node-action {
+  width: 22px;
+  min-width: 22px;
+  min-height: 22px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 2px;
+  background: white;
+  color: var(--text);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 13px;
+  line-height: 1;
+  box-shadow: 0 8px 18px rgb(24 25 27 / 0.09);
+}
+
+.flow-node-action.danger {
+  border-color: rgb(217 75 95 / 0.8);
+  background: #d94b5f;
+  color: white;
 }
 
 .flow-node-top,
