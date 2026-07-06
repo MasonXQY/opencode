@@ -40,6 +40,7 @@
   --presight-shadow-input: 0 0 0 4px rgb(59 135 214 / 0.14);
   --factory-bg: #f3f4f3;
   --factory-surface: #ffffff;
+  --factory-canvas: #fbfbfa;
   --factory-surface-muted: #f7f7f6;
   --factory-topbar: #ffffff;
   --factory-text: var(--presight-color-gray-900);
@@ -119,7 +120,9 @@
 body {
   margin: 0;
   min-width: 320px;
-  background: var(--factory-bg), var(--presight-color-gray-50);
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.56), transparent 220px),
+    var(--factory-bg);
 }
 
 button,
@@ -137,7 +140,8 @@ button {
   font-size: 14px;
   line-height: 20px;
   font-weight: 700;
-  padding: 10px 12px;
+  min-height: 40px;
+  padding: 9px 12px;
   cursor: pointer;
   box-shadow: var(--presight-shadow-xs);
   transition:
@@ -197,6 +201,7 @@ select {
   border-radius: var(--presight-radius-md);
   background: var(--factory-surface);
   color: var(--presight-color-gray-900);
+  min-height: 40px;
   padding: 9px 10px;
   outline: none;
   box-shadow: none;
@@ -334,7 +339,7 @@ h3 {
   display: grid;
   grid-template-rows: auto 1fr;
   border: 1px solid var(--presight-color-gray-200);
-  border-radius: 0;
+  border-radius: 14px;
   background: var(--factory-surface);
   box-shadow: var(--presight-shadow-m);
   overflow: hidden;
@@ -346,7 +351,7 @@ h3 {
   justify-content: space-between;
   gap: 16px;
   align-items: center;
-  padding: 14px 18px;
+  padding: 12px 18px;
   border-bottom: 1px solid var(--presight-color-gray-200);
   background: var(--factory-topbar);
   box-shadow: none;
@@ -361,25 +366,25 @@ h3 {
 }
 
 .topbar-primary > div:first-child {
-  min-width: 170px;
+  min-width: 184px;
 }
 
 .workspace-summary {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   color: var(--presight-color-gray-600);
 }
 
 .workspace-summary span {
-  min-width: 66px;
+  min-width: 68px;
   display: grid;
   gap: 1px;
   padding: 6px 9px;
   border: 1px solid var(--presight-color-gray-200);
   border-radius: var(--presight-radius-md);
-  background: var(--presight-color-gray-25);
+  background: #ffffff;
   font-size: 11px;
   line-height: 14px;
   font-weight: 800;
@@ -417,7 +422,7 @@ h3 {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: 8px;
 }
 
 .topbar-actions > button {
@@ -434,6 +439,7 @@ h3 {
 
 .design-button {
   min-width: 128px;
+  min-height: 50px;
   display: grid;
   gap: 2px;
   text-align: left;
@@ -528,6 +534,7 @@ h3 {
 
 .permission-button {
   min-width: 176px;
+  min-height: 50px;
   display: grid;
   gap: 2px;
   text-align: left;
@@ -830,7 +837,7 @@ h3 {
 
 .workspace-grid {
   display: grid;
-  grid-template-columns: minmax(300px, 352px) minmax(0, 1fr);
+  grid-template-columns: minmax(292px, 344px) minmax(0, 1fr);
   height: 100%;
   min-height: 0;
   overflow: hidden;
@@ -841,7 +848,7 @@ h3 {
   height: 100%;
   display: grid;
   align-content: start;
-  gap: 12px;
+  gap: 11px;
   padding: 14px;
   border-right: 1px solid var(--presight-color-gray-200);
   background: linear-gradient(180deg, #f9f9f8, var(--factory-surface-muted));
@@ -852,7 +859,7 @@ h3 {
   min-width: 0;
   min-height: 0;
   height: 100%;
-  background: var(--factory-surface);
+  background: var(--factory-canvas);
   overflow: auto;
 }
 
@@ -866,12 +873,12 @@ h3 {
   border: 1px solid var(--presight-color-gray-200);
   border-radius: var(--presight-radius-md);
   background: var(--factory-surface);
-  box-shadow: var(--presight-shadow-xs);
+  box-shadow: none;
 }
 
 .panel {
   display: grid;
-  gap: 12px;
+  gap: 11px;
   padding: 12px;
 }
 
@@ -910,7 +917,7 @@ h3 {
 
 .panel-heading span,
 .section-heading span {
-  color: var(--presight-color-blue-600);
+  color: var(--presight-color-gray-500);
   font-size: 12px;
   line-height: 16px;
   font-weight: 800;
@@ -938,7 +945,7 @@ h3 {
 
 .project-picker {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   max-height: 168px;
   overflow: auto;
   scrollbar-width: thin;
@@ -949,6 +956,7 @@ h3 {
   min-width: 0;
   display: grid;
   gap: 2px;
+  min-height: 58px;
   padding: 9px 10px;
   text-align: left;
   background: var(--factory-surface);
@@ -964,8 +972,10 @@ h3 {
 
 .project-picker button.active {
   border-color: var(--presight-color-gray-300);
-  background: var(--presight-color-gray-100);
-  box-shadow: inset 3px 0 0 var(--presight-color-blue-600);
+  background: #ffffff;
+  box-shadow:
+    inset 3px 0 0 var(--presight-color-blue-600),
+    0 8px 18px rgb(15 23 42 / 0.04);
 }
 
 .project-picker strong,
@@ -1014,8 +1024,10 @@ h3 {
 .scale-row button.active,
 .task-card.active {
   border-color: var(--presight-color-blue-500);
-  background: var(--presight-color-blue-50);
-  box-shadow: none;
+  background: #ffffff;
+  box-shadow:
+    inset 3px 0 0 var(--presight-color-blue-600),
+    0 8px 18px rgb(15 23 42 / 0.04);
 }
 
 .mode-cards span,
@@ -1199,7 +1211,7 @@ h3 {
 .task-list-summary span {
   border: 1px solid var(--presight-color-gray-200);
   border-radius: 999px;
-  background: var(--presight-color-gray-25);
+  background: #ffffff;
   color: var(--presight-color-gray-700);
   padding: 4px 8px;
   font-size: 12px;
@@ -1229,8 +1241,19 @@ h3 {
 .task-card {
   width: 100%;
   display: grid;
-  gap: 7px;
-  margin-bottom: 8px;
+  gap: 8px;
+  margin-bottom: 7px;
+  padding: 11px;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.task-card:hover {
+  border-color: var(--presight-color-gray-300);
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgb(15 23 42 / 0.04);
 }
 
 .task-card-top {
@@ -1351,18 +1374,21 @@ h3 {
 
 .task-detail {
   width: 100%;
-  max-width: 1160px;
+  max-width: 1200px;
   min-height: 100%;
   display: grid;
   gap: 16px;
-  padding: 20px;
+  padding: 18px;
   margin: 0 auto;
 }
 
 .detail-header {
-  align-items: start;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--presight-color-gray-200);
+  align-items: center;
+  padding: 16px;
+  border: 1px solid var(--presight-color-gray-200);
+  border-radius: var(--presight-radius-md);
+  background: #ffffff;
+  box-shadow: 0 10px 26px rgb(15 23 42 / 0.04);
 }
 
 .detail-kicker {
@@ -1380,7 +1406,7 @@ h3 {
 .task-layout {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 760px) minmax(260px, 300px);
+  grid-template-columns: minmax(0, 820px) minmax(256px, 300px);
   justify-content: center;
   align-items: start;
   gap: 16px;
@@ -1391,7 +1417,7 @@ h3 {
   min-width: 0;
   display: grid;
   align-content: start;
-  gap: 16px;
+  gap: 14px;
 }
 
 .task-main > * {
@@ -1400,7 +1426,7 @@ h3 {
 
 .task-aside {
   position: sticky;
-  top: 96px;
+  top: 18px;
   max-height: calc(100vh - 132px);
   overflow: auto;
   padding-bottom: 2px;
@@ -1414,7 +1440,12 @@ h3 {
   display: grid;
   gap: 12px;
   align-content: start;
-  padding: 14px;
+  padding: 13px;
+}
+
+.agent-stage {
+  border-color: var(--presight-color-gray-200);
+  background: #ffffff;
 }
 
 .agent-stage p {
@@ -1427,23 +1458,23 @@ h3 {
 .context-note {
   padding: 10px;
   border-radius: var(--presight-radius-md);
-  background: var(--presight-color-blue-50);
-  color: var(--presight-color-blue-700);
+  background: var(--presight-color-gray-50);
+  color: var(--presight-color-gray-700);
   font-size: 12px;
   line-height: 16px;
 }
 
 .swarm-panel {
-  border-color: var(--presight-color-blue-200);
+  border-color: var(--presight-color-gray-200);
 }
 
 .chain-nav {
   overflow: hidden;
   padding: 14px;
-  border: 1px solid var(--presight-color-blue-200);
-  border-radius: var(--presight-radius-lg);
+  border: 1px solid var(--presight-color-gray-200);
+  border-radius: var(--presight-radius-md);
   background: var(--factory-surface);
-  box-shadow: var(--presight-shadow-xs);
+  box-shadow: none;
 }
 
 .chain-summary {
@@ -1466,12 +1497,12 @@ h3 {
 
 .chain-summary > strong {
   color: var(--presight-color-blue-700);
-  font-size: 24px;
-  line-height: 32px;
+  font-size: 22px;
+  line-height: 28px;
 }
 
 .chain-meter {
-  height: 8px;
+  height: 6px;
   overflow: hidden;
   border-radius: 64px;
   background: var(--presight-color-gray-100);
@@ -1494,12 +1525,12 @@ h3 {
 }
 
 .chain-step {
-  flex: 0 0 172px;
+  flex: 0 0 168px;
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr);
   align-items: start;
   gap: 8px;
-  min-height: 74px;
+  min-height: 78px;
   text-align: left;
   background: var(--factory-surface);
   color: var(--presight-color-gray-800);
@@ -1509,8 +1540,8 @@ h3 {
 
 .chain-step.active {
   border-color: var(--presight-color-blue-500);
-  background: var(--presight-color-blue-25);
-  box-shadow: var(--presight-shadow-input);
+  background: #ffffff;
+  box-shadow: inset 3px 0 0 var(--presight-color-blue-600);
 }
 
 .chain-step > .agent-identity {
@@ -1619,18 +1650,18 @@ h3 {
 .timeline {
   display: grid;
   align-content: start;
-  gap: 10px;
-  max-height: min(58vh, 640px);
+  gap: 8px;
+  max-height: min(52vh, 560px);
   overflow: auto;
   overscroll-behavior: contain;
-  padding: 16px;
+  padding: 14px;
   scrollbar-width: thin;
   scrollbar-color: var(--presight-color-gray-300) transparent;
 }
 
 .timeline > .section-heading {
   position: sticky;
-  top: -16px;
+  top: -14px;
   z-index: 1;
   padding: 0 0 10px;
   background: var(--factory-surface);
@@ -1641,8 +1672,8 @@ h3 {
   display: grid;
   gap: 12px;
   align-content: start;
-  padding: 16px;
-  border-color: var(--presight-color-blue-200);
+  padding: 14px;
+  border-color: var(--presight-color-gray-200);
 }
 
 .result-grid {
@@ -1654,6 +1685,7 @@ h3 {
 .result-metric {
   display: grid;
   gap: 4px;
+  min-height: 76px;
   padding: 12px;
   border: 1px solid var(--presight-color-gray-200);
   border-radius: var(--presight-radius-md);
@@ -1717,10 +1749,10 @@ h3 {
   align-items: center;
   gap: 4px;
   padding: 12px;
-  border: 1px solid var(--presight-color-blue-200);
+  border: 1px solid var(--presight-color-gray-200);
   border-radius: var(--presight-radius-md);
-  background: var(--presight-color-blue-25);
-  color: var(--presight-color-blue-800);
+  background: #ffffff;
+  color: var(--presight-color-gray-800);
   text-align: left;
   box-shadow: none;
 }
@@ -1747,7 +1779,7 @@ h3 {
 }
 
 .artifact-link b {
-  color: var(--presight-color-blue-700);
+  color: var(--presight-color-gray-900);
   font-size: 12px;
   line-height: 16px;
 }
@@ -1772,10 +1804,10 @@ h3 {
   white-space: pre-wrap;
   word-break: break-word;
   margin: 0;
-  padding: 12px;
+  padding: 10px;
   border: 1px solid var(--presight-color-gray-200);
   border-radius: var(--presight-radius-md);
-  background: var(--presight-color-gray-25);
+  background: #ffffff;
   color: var(--presight-color-gray-800);
   font-family: "SFMono-Regular", Consolas, monospace;
   font-size: 12px;
@@ -1823,7 +1855,7 @@ h3 {
 
 .deliverable-card,
 .agent-result {
-  grid-template-columns: minmax(0, 180px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 168px) minmax(0, 1fr);
   align-items: start;
 }
 
@@ -1880,6 +1912,7 @@ h3 {
     height: 100vh;
     margin: 0;
     border: 0;
+    border-radius: 0;
     box-shadow: none;
   }
 
@@ -1890,7 +1923,7 @@ h3 {
 
   .topbar-primary {
     width: 100%;
-    align-items: start;
+    align-items: center;
     justify-content: space-between;
   }
 
@@ -1903,6 +1936,16 @@ h3 {
     width: 100%;
     flex-wrap: wrap;
     justify-content: start;
+  }
+
+  .design-control,
+  .permission-control {
+    flex: 1 1 220px;
+  }
+
+  .design-button,
+  .permission-button {
+    width: 100%;
   }
 
   .manager-layout,
@@ -1939,6 +1982,7 @@ h3 {
   }
 
   .sidebar {
+    max-height: 44vh;
     border-right: 0;
     border-bottom: 1px solid var(--presight-color-gray-200);
   }
@@ -1971,7 +2015,7 @@ h3 {
   }
 
   .chain-step {
-    flex-basis: 172px;
+    flex-basis: 168px;
   }
 }
 
@@ -1996,6 +2040,10 @@ h3 {
     width: 100%;
   }
 
+  .topbar-primary > div:first-child {
+    min-width: 0;
+  }
+
   .workspace-summary {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -2007,6 +2055,18 @@ h3 {
   .workspace-summary small {
     grid-column: 1 / -1;
     max-width: none;
+  }
+
+  .detail-header {
+    align-items: stretch;
+  }
+
+  .detail-header > button {
+    width: 100%;
+  }
+
+  .sidebar {
+    max-height: 50vh;
   }
 
   .product-style-grid strong,

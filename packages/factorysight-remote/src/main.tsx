@@ -643,16 +643,18 @@ function DesignLibrarySwitcher(props: { value: DesignThemeId; onChange: (theme: 
   const active = createMemo(() => designThemes.find((theme) => theme.id === props.value) ?? designThemes[0])
   return (
     <div class="design-control">
-      <button class="design-button" type="button" onClick={() => setOpen(!open())}>
-        <span>Workspace</span>
+      <button class="design-button" type="button" aria-haspopup="menu" aria-expanded={open()} onClick={() => setOpen(!open())}>
+        <span>Style</span>
         <strong>{active().name}</strong>
       </button>
       <Show when={open()}>
-        <div class="design-menu">
+        <div class="design-menu" role="menu">
           <For each={designThemes}>
             {(theme) => (
               <button
                 type="button"
+                role="menuitemradio"
+                aria-checked={theme.id === props.value}
                 classList={{ active: theme.id === props.value }}
                 onClick={() => {
                   props.onChange(theme.id)
@@ -681,7 +683,7 @@ function ProjectSwitcher(props: {
   return (
     <section class="panel">
       <div class="panel-heading">
-        <h2>Project</h2>
+        <h2>Projects</h2>
         <span>{props.projects.length} total</span>
       </div>
       <Show when={props.projects.length > 0} fallback={<div class="muted">Create a project to start.</div>}>
@@ -728,7 +730,13 @@ function PermissionSwitcher(props: {
 
   return (
     <div class="permission-control">
-      <button class="permission-button" disabled={!props.project || busy()} onClick={() => setOpen(!open())}>
+      <button
+        class="permission-button"
+        disabled={!props.project || busy()}
+        aria-haspopup="menu"
+        aria-expanded={open()}
+        onClick={() => setOpen(!open())}
+      >
         <span>Permission</span>
         <strong>{active()?.name ?? "No project"}</strong>
       </button>
