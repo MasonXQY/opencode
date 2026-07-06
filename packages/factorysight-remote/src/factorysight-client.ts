@@ -48,6 +48,24 @@ export function factorySightApiArgs(method: string, requestPath: string, body?: 
   return args
 }
 
+export function factorySightApiUrl(baseUrl: string, requestPath: string) {
+  return new URL(requestPath.replace(/^\//, ""), baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`).toString()
+}
+
+async function factorySightHttpApi(method: string, requestPath: string, body?: unknown) {
+  const baseUrl = process.env.FACTORYSIGHT_BACKEND_URL
+  if (!baseUrl) return undefined
+  const response = await fetch(factorySightApiUrl(baseUrl, requestPath), {
+    method,
+    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  const text = await response.text()
+  if (!response.ok) throw new Error(text || `FactorySight backend returned HTTP ${response.status}`)
+  if (!text.trim()) return undefined
+  return JSON.parse(text)
+}
+
 async function readText(stream: AsyncIterable<Uint8Array>) {
   const decoder = new TextDecoder()
   let text = ""
@@ -56,6 +74,9 @@ async function readText(stream: AsyncIterable<Uint8Array>) {
 }
 
 async function factorySightApi(method: string, requestPath: string, body?: unknown) {
+  const httpResponse = await factorySightHttpApi(method, requestPath, body)
+  if (httpResponse !== undefined || process.env.FACTORYSIGHT_BACKEND_URL) return httpResponse
+
   const proc = spawn(binaryPath(), factorySightApiArgs(method, requestPath, body), {
     stdio: ["ignore", "pipe", "pipe"],
     env: {

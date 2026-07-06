@@ -36,11 +36,12 @@ State is stored in `~/.factorysight-remote/state.json` by default. Override it w
 
 Remote supports two backend modes:
 
-- `FACTORYSIGHT_REMOTE_BACKEND=factorysight`: task execution and model discovery go through FactorySight. The adapter prefers `factorysight api` when available and falls back to the installed FactorySight CLI transport for current installations.
+- `FACTORYSIGHT_REMOTE_BACKEND=factorysight`: task execution and model discovery go through FactorySight. When `FACTORYSIGHT_BACKEND_URL` is set, Remote calls the FactorySight HTTP API directly. Otherwise the adapter prefers `factorysight api` when available and falls back to the installed FactorySight CLI transport for current installations.
 - `FACTORYSIGHT_REMOTE_BACKEND=local`: local development compatibility mode. This is the browser dev default.
 
-The desktop app defaults to `factorysight`. Browser development defaults to `local` until the remaining MVP
-storage and artifact APIs are moved behind FactorySight endpoints.
+The desktop app defaults to `factorysight`, starts a local `factorysight serve` backend when needed, and injects
+`FACTORYSIGHT_BACKEND_URL` into the Remote gateway. Browser development defaults to `local` until the remaining
+MVP storage and artifact APIs are moved behind FactorySight endpoints.
 
 ## Backend Permission Controls
 

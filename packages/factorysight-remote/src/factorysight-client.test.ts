@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { factorySightApiArgs, modelRefFromString, modelsFromFactorySightResponse } from "./factorysight-client"
+import { factorySightApiArgs, factorySightApiUrl, modelRefFromString, modelsFromFactorySightResponse } from "./factorysight-client"
 
 test("modelRefFromString converts remote model strings into FactorySight model refs", () => {
   expect(modelRefFromString("anthropic/claude-opus-4-8")).toEqual({
@@ -35,4 +35,9 @@ test("factorySightApiArgs builds raw FactorySight API commands", () => {
     "--data",
     '{"ok":true}',
   ])
+})
+
+test("factorySightApiUrl resolves API paths against a FactorySight backend URL", () => {
+  expect(factorySightApiUrl("http://127.0.0.1:4096", "/api/model")).toBe("http://127.0.0.1:4096/api/model")
+  expect(factorySightApiUrl("http://127.0.0.1:4096/", "/api/session")).toBe("http://127.0.0.1:4096/api/session")
 })

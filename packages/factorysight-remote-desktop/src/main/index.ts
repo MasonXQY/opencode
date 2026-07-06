@@ -1,9 +1,11 @@
 import { createServer } from "node:net"
+import { spawn, type ChildProcess } from "node:child_process"
 import { join, resolve } from "node:path"
 import { serve } from "@hono/node-server"
 import { app, BrowserWindow, Menu, shell } from "electron"
 
 let remoteServer: ReturnType<typeof serve> | undefined
+let factorySightServer: ChildProcess | undefined
 let mainWindow: BrowserWindow | undefined
 
 function findFreePort() {
@@ -28,7 +30,56 @@ function remoteClientDir() {
   return resolve(app.getAppPath(), "../factorysight-remote/dist/client")
 }
 
+function factorySightBinary() {
+  return (
+    process.env.FACTORYSIGHT_BIN ??
+    (process.env.HOME ? join(process.env.HOME, ".opencode", "bin", "factorysight") : "factorysight")
+  )
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function waitForFactorySight(url: string) {
+  let lastError: unknown
+  for (let attempt = 0; attempt < 80; attempt++) {
+    try {
+      const response = await fetch(new URL("/api/health", url), { signal: AbortSignal.timeout(1000) })
+      if (response.ok) return
+      lastError = new Error(`HTTP ${response.status}`)
+    } catch (error) {
+      lastError = error
+    }
+    await sleep(100)
+  }
+  throw new Error(`FactorySight backend did not become healthy: ${lastError instanceof Error ? lastError.message : String(lastError)}`)
+}
+
+async function startFactorySightBackend() {
+  if (process.env.FACTORYSIGHT_BACKEND_URL) return process.env.FACTORYSIGHT_BACKEND_URL
+  const port = Number(process.env.FACTORYSIGHT_BACKEND_PORT ?? (await findFreePort()))
+  const url = `http://127.0.0.1:${port}`
+  const server = spawn(factorySightBinary(), ["serve", "--hostname", "127.0.0.1", "--port", String(port)], {
+    stdio: ["ignore", "pipe", "pipe"],
+    env: {
+      ...process.env,
+      OPENCODE_DISABLE_AUTOUPDATE: "1",
+    },
+  })
+  factorySightServer = server
+  server.on("exit", (code, signal) => {
+    if (code === 0 || signal) return
+    console.error(`FactorySight backend exited with code ${code}`)
+  })
+  server.stderr?.on("data", (chunk) => console.error(String(chunk).trim()))
+  await waitForFactorySight(url)
+  process.env.FACTORYSIGHT_BACKEND_URL = url
+  return url
+}
+
 async function startRemoteServer() {
+  await startFactorySightBackend()
   const port = Number(process.env.FACTORYSIGHT_REMOTE_DESKTOP_PORT ?? (await findFreePort()))
   process.env.FACTORYSIGHT_REMOTE_HOST = "127.0.0.1"
   process.env.FACTORYSIGHT_REMOTE_PORT = String(port)
@@ -184,6 +235,7 @@ app.on("activate", () => {
 
 app.on("before-quit", () => {
   remoteServer?.close()
+  factorySightServer?.kill()
 })
 
 app
