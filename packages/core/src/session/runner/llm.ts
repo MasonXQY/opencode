@@ -10,23 +10,23 @@ import {
   isContextOverflowFailure,
   type ProviderErrorEvent,
 } from "@opencode-ai/llm"
-import { Cause, DateTime, Effect, Exit, FiberSet, Layer, Option, Semaphore, Stream } from "effect"
+import { Cause, Effect, Exit, FiberSet, Layer, Option, Semaphore, Stream } from "effect"
 import { AgentV2 } from "../../agent"
 import { Config } from "../../config"
 import { Database } from "../../database/database"
 import { EventV2 } from "../../event"
 import { Location } from "../../location"
 import { QuestionV2 } from "../../question"
-import { SystemContext } from "../../system-context/index"
-import { SystemContextBuiltIns } from "../../system-context/builtins"
-import { InstructionContext } from "../../instruction-context"
+import { Instructions } from "../../instructions/index"
+import { InstructionBuiltIns } from "../../instructions/builtins"
+import { InstructionDiscovery } from "../../instruction-discovery"
 import { SkillGuidance } from "../../skill/guidance"
 import { ReferenceGuidance } from "../../reference/guidance"
 import { McpGuidance } from "../../mcp/guidance"
-import { SessionContextEntry } from "../context-entry"
+import { InstructionEntry } from "../instruction-entry"
 import { ToolRegistry } from "../../tool/registry"
 import { ToolOutputStore } from "../../tool-output-store"
-import { SessionContextCheckpoint } from "../context-checkpoint"
+import { InstructionCheckpoint } from "../instruction-checkpoint"
 import { SessionCompaction } from "../compaction"
 import { SessionEvent } from "../event"
 import { SessionHistory } from "../history"
@@ -104,12 +104,12 @@ const layer = Layer.effect(
     const models = yield* SessionRunnerModel.Service
     const store = yield* SessionStore.Service
     const location = yield* Location.Service
-    const builtins = yield* SystemContextBuiltIns.Service
-    const instructions = yield* InstructionContext.Service
+    const builtins = yield* InstructionBuiltIns.Service
+    const discovery = yield* InstructionDiscovery.Service
     const skillGuidance = yield* SkillGuidance.Service
     const referenceGuidance = yield* ReferenceGuidance.Service
     const mcpGuidance = yield* McpGuidance.Service
-    const contextEntries = yield* SessionContextEntry.Service
+    const entries = yield* InstructionEntry.Service
     const snapshots = yield* Snapshot.Service
     const db = (yield* Database.Service).db
     const compaction = yield* SessionCompaction.Service
@@ -153,18 +153,18 @@ const layer = Layer.effect(
     const isQuestionRejected = (cause: Cause.Cause<unknown>) =>
       cause.reasons.some((reason) => Cause.isDieReason(reason) && reason.defect instanceof QuestionV2.RejectedError)
 
-    const loadSystemContext = (agent: AgentV2.Selection, sessionID: SessionSchema.ID) =>
+    const loadInstructions = (agent: AgentV2.Selection, sessionID: SessionSchema.ID) =>
       Effect.all(
         [
           builtins.load(),
-          instructions.load(),
+          discovery.load(sessionID),
           skillGuidance.load(agent),
           referenceGuidance.load(),
           mcpGuidance.load(agent),
-          contextEntries.load(sessionID),
+          entries.load(sessionID),
         ],
         { concurrency: "unbounded" },
-      ).pipe(Effect.map(SystemContext.combine))
+      ).pipe(Effect.map(Instructions.combine))
 
     const attemptStep = Effect.fn("SessionRunner.attemptStep")(function* (
       sessionID: SessionSchema.ID,
@@ -178,10 +178,10 @@ const layer = Layer.effect(
       const agent = yield* agents.select(session.agent)
       // Establish what the model knows before admitting what the user said, so
       // a blocked first step leaves pending inputs untouched.
-      const checkpoint = yield* SessionContextCheckpoint.prepare(
+      const checkpoint = yield* InstructionCheckpoint.prepare(
         db,
         events,
-        loadSystemContext(agent, session.id),
+        loadInstructions(agent, session.id),
         session.id,
       )
       const toolFibers = yield* FiberSet.make<void, ToolOutputStore.Error>()
@@ -460,12 +460,12 @@ export const node = makeLocationNode({
     SessionRunnerModel.node,
     SessionStore.node,
     Location.node,
-    SystemContextBuiltIns.node,
-    InstructionContext.node,
+    InstructionBuiltIns.node,
+    InstructionDiscovery.node,
     SkillGuidance.node,
     ReferenceGuidance.node,
     McpGuidance.node,
-    SessionContextEntry.node,
+    InstructionEntry.node,
     SessionCompaction.node,
     SessionTitle.node,
     Config.node,

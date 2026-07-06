@@ -1,5 +1,5 @@
 import { SessionV2 } from "@opencode-ai/core/session"
-import { SessionContextEntry } from "@opencode-ai/core/session/context-entry"
+import { InstructionEntry } from "@opencode-ai/core/session/instruction-entry"
 import { DateTime, Effect, Stream } from "effect"
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
 import { Api } from "../api"
@@ -544,25 +544,25 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
         }),
       )
       .handle(
-        "session.context.entry.list",
+        "session.instructions.list",
         Effect.fn(function* (ctx) {
-          const contextEntries = yield* SessionContextEntry.Service
-          return { data: yield* contextEntries.list(ctx.params.sessionID) }
+          const instructions = yield* InstructionEntry.Service
+          return { data: yield* instructions.list(ctx.params.sessionID) }
         }),
       )
       .handle(
-        "session.context.entry.put",
+        "session.instructions.put",
         Effect.fn(function* (ctx) {
-          const contextEntries = yield* SessionContextEntry.Service
-          yield* contextEntries.put({ sessionID: ctx.params.sessionID, key: ctx.params.key, value: ctx.payload.value })
+          const instructions = yield* InstructionEntry.Service
+          yield* instructions.put({ sessionID: ctx.params.sessionID, key: ctx.params.key, value: ctx.payload.value })
           return HttpApiSchema.NoContent.make()
         }),
       )
       .handle(
-        "session.context.entry.remove",
+        "session.instructions.remove",
         Effect.fn(function* (ctx) {
-          const contextEntries = yield* SessionContextEntry.Service
-          yield* contextEntries.remove({ sessionID: ctx.params.sessionID, key: ctx.params.key })
+          const instructions = yield* InstructionEntry.Service
+          yield* instructions.remove({ sessionID: ctx.params.sessionID, key: ctx.params.key })
           return HttpApiSchema.NoContent.make()
         }),
       )

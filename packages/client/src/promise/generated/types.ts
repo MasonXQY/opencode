@@ -1095,26 +1095,26 @@ export type SessionContextOutput = {
   >
 }["data"]
 
-export type SessionListContextEntriesInput = { readonly sessionID: { readonly sessionID: string }["sessionID"] }
+export type SessionInstructionsListInput = { readonly sessionID: { readonly sessionID: string }["sessionID"] }
 
-export type SessionListContextEntriesOutput = {
+export type SessionInstructionsListOutput = {
   readonly data: ReadonlyArray<{ readonly key: string; readonly value: JsonValue }>
 }["data"]
 
-export type SessionPutContextEntryInput = {
+export type SessionInstructionsPutInput = {
   readonly sessionID: { readonly sessionID: string; readonly key: string }["sessionID"]
   readonly key: { readonly sessionID: string; readonly key: string }["key"]
   readonly value: { readonly value: JsonValue }["value"]
 }
 
-export type SessionPutContextEntryOutput = void
+export type SessionInstructionsPutOutput = void
 
-export type SessionRemoveContextEntryInput = {
+export type SessionInstructionsRemoveInput = {
   readonly sessionID: { readonly sessionID: string; readonly key: string }["sessionID"]
   readonly key: { readonly sessionID: string; readonly key: string }["key"]
 }
 
-export type SessionRemoveContextEntryOutput = void
+export type SessionInstructionsRemoveOutput = void
 
 export type SessionLogInput = {
   readonly sessionID: { readonly sessionID: string }["sessionID"]
@@ -1216,10 +1216,24 @@ export type SessionLogOutput =
           readonly id: string
           readonly created: number
           readonly metadata?: { readonly [x: string]: unknown }
-          readonly type: "session.context.updated"
+          readonly type: "session.instructions.updated"
           readonly durable: { readonly aggregateID: string; readonly seq: number; readonly version: number }
           readonly location?: { readonly directory: string; readonly workspaceID?: string }
           readonly data: { readonly sessionID: string; readonly text: string }
+        }
+      | {
+          readonly id: string
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown }
+          readonly type: "session.instructions.discovered"
+          readonly durable: { readonly aggregateID: string; readonly seq: number; readonly version: number }
+          readonly location?: { readonly directory: string; readonly workspaceID?: string }
+          readonly data: {
+            readonly sessionID: string
+            readonly assistantMessageID: string
+            readonly location: { readonly directory: string; readonly workspaceID?: string }
+            readonly files: ReadonlyArray<{ readonly path: string; readonly content: string }>
+          }
         }
       | {
           readonly id: string
@@ -4500,10 +4514,24 @@ export type EventSubscribeOutput =
       readonly id: string
       readonly created: number
       readonly metadata?: { readonly [x: string]: unknown }
-      readonly type: "session.context.updated"
+      readonly type: "session.instructions.updated"
       readonly durable: { readonly aggregateID: string; readonly seq: number; readonly version: number }
       readonly location?: { readonly directory: string; readonly workspaceID?: string }
       readonly data: { readonly sessionID: string; readonly text: string }
+    }
+  | {
+      readonly id: string
+      readonly created: number
+      readonly metadata?: { readonly [x: string]: unknown }
+      readonly type: "session.instructions.discovered"
+      readonly durable: { readonly aggregateID: string; readonly seq: number; readonly version: number }
+      readonly location?: { readonly directory: string; readonly workspaceID?: string }
+      readonly data: {
+        readonly sessionID: string
+        readonly assistantMessageID: string
+        readonly location: { readonly directory: string; readonly workspaceID?: string }
+        readonly files: ReadonlyArray<{ readonly path: string; readonly content: string }>
+      }
     }
   | {
       readonly id: string

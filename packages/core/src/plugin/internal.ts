@@ -31,7 +31,7 @@ import { PermissionV2 } from "../permission"
 import { QuestionV2 } from "../question"
 import { Reference } from "../reference"
 import { Ripgrep } from "../ripgrep"
-import { SessionInstructions } from "../session/instructions"
+import { InstructionDiscovery } from "../instruction-discovery"
 import { SessionTodo } from "../session/todo"
 import { Shell } from "../shell"
 import { SkillV2 } from "../skill"
@@ -84,7 +84,7 @@ export type Requirements =
   | ReadToolFileSystem.Service
   | Reference.Service
   | Ripgrep.Service
-  | SessionInstructions.Service
+  | InstructionDiscovery.Service
   | SessionTodo.Service
   | Shell.Service
   | SkillV2.Service
@@ -124,7 +124,7 @@ const layer = Layer.effectDiscard(
       Context.make(PermissionV2.Service, yield* PermissionV2.Service),
       Context.make(QuestionV2.Service, yield* QuestionV2.Service),
       Context.make(ReadToolFileSystem.Service, yield* ReadToolFileSystem.Service),
-      Context.make(SessionInstructions.Service, yield* SessionInstructions.Service),
+      Context.make(InstructionDiscovery.Service, yield* InstructionDiscovery.Service),
       Context.make(SessionTodo.Service, yield* SessionTodo.Service),
       Context.make(SkillV2.Service, yield* SkillV2.Service),
       Context.make(Reference.Service, yield* Reference.Service),
@@ -197,7 +197,7 @@ export const node = makeLocationNode({
     PermissionV2.node,
     QuestionV2.node,
     ReadToolFileSystem.node,
-    SessionInstructions.node,
+    InstructionDiscovery.node,
     SessionTodo.node,
     SkillV2.node,
     Reference.node,

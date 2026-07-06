@@ -686,8 +686,8 @@ describe("EventV2", () => {
     Effect.gen(function* () {
       const events = yield* EventV2.Service
       const aggregateID = Session.ID.create()
-      const received = new Array<typeof SessionEvent.ContextUpdated.Type>()
-      yield* events.project(SessionEvent.ContextUpdated, (event) =>
+      const received = new Array<typeof SessionEvent.InstructionsUpdated.Type>()
+      yield* events.project(SessionEvent.InstructionsUpdated, (event) =>
         Effect.sync(() => {
           received.push(event)
         }),
@@ -696,7 +696,7 @@ describe("EventV2", () => {
       yield* events.replay({
         id: EventV2.ID.create(),
         created: DateTime.makeUnsafe(0),
-        type: EventV2.versionedType(SessionEvent.ContextUpdated.type, 1),
+        type: EventV2.versionedType(SessionEvent.InstructionsUpdated.type, 1),
         seq: 0,
         aggregateID,
         data: { sessionID: aggregateID, text: "context" },

@@ -20,7 +20,8 @@ import { ToolOutputStore } from "@opencode-ai/core/tool-output-store"
 import { ReadTool } from "@opencode-ai/core/tool/read"
 import { ReadToolFileSystem } from "@opencode-ai/core/tool/read-filesystem"
 import { makeLocationNode } from "@opencode-ai/core/effect/app-node"
-import { SessionInstructions } from "@opencode-ai/core/session/instructions"
+import { InstructionDiscovery } from "@opencode-ai/core/instruction-discovery"
+import { Instructions } from "@opencode-ai/core/instructions"
 import { testEffect } from "./lib/effect"
 import { toolIdentity, executeTool, registerToolPlugin, settleTool, toolDefinitions } from "./lib/tool"
 
@@ -33,7 +34,7 @@ const readToolNode = makeLocationNode({
     LocationMutation.node,
     Image.node,
     PermissionV2.node,
-    SessionInstructions.node,
+    InstructionDiscovery.node,
     FSUtil.node,
     Location.node,
   ],
@@ -47,6 +48,8 @@ const readCalls: {
   page: ReadToolFileSystem.PageInput
 }[] = []
 const listCalls: ReadToolFileSystem.PageInput[] = []
+const discoveredInstructions: string[][] = []
+let instructionPaths: string[] = []
 let resolvedType: "file" | "directory" = "file"
 let resolveFailure: unknown
 let readResult: FileSystem.Content | ReadToolFileSystem.TextPage = {
@@ -108,6 +111,7 @@ const testFileSystem = Layer.effect(
                 }),
               )
             : Effect.succeed(path),
+        up: () => Effect.succeed(instructionPaths),
       }),
     ),
   ),
@@ -146,6 +150,10 @@ const unavailableImage = Layer.succeed(
   Image.Service,
   Image.Service.of({ normalize: () => Effect.fail(new Image.ResizerUnavailableError()) }),
 )
+const instructionDiscovery = Layer.mock(InstructionDiscovery.Service, {
+  load: (_sessionID) => Effect.succeed(Instructions.empty),
+  discover: (input) => Effect.sync(() => void discoveredInstructions.push([...input.paths])),
+})
 const readLayer = (imageLayer: Layer.Layer<Image.Service>) =>
   AppNodeBuilder.build(LayerNode.group([ToolRegistry.node, ToolRegistry.toolsNode, readToolNode]), [
     [ReadToolFileSystem.node, reader],
@@ -155,6 +163,7 @@ const readLayer = (imageLayer: Layer.Layer<Image.Service>) =>
     [LocationMutation.node, mutation],
     [FSUtil.node, testFileSystem],
     [Location.node, locationLayer],
+    [InstructionDiscovery.node, instructionDiscovery],
     [Global.node, Global.layerWith({ data: Global.Path.data })],
     [ToolOutputStore.node, ToolOutputStore.nodeWithoutConfig],
   ])
@@ -167,6 +176,8 @@ describe("ReadTool", () => {
     assertions.length = 0
     readCalls.length = 0
     listCalls.length = 0
+    discoveredInstructions.length = 0
+    instructionPaths = []
     allow = true
     resolvedType = "file"
     resolveFailure = undefined
@@ -678,6 +689,7 @@ describe("ReadTool", () => {
         mime: "application/octet-stream",
       }
       const registry = yield* ToolRegistry.Service
+      instructionPaths = [path.join(process.cwd(), "sub", "AGENTS.md")]
 
       expect(
         yield* executeTool(registry, {
@@ -686,6 +698,7 @@ describe("ReadTool", () => {
           call: { type: "tool-call", id: "call-direct-binary", name: "read", input: { path: "late-binary" } },
         }),
       ).toEqual({ type: "error", value: "Cannot read binary file: late-binary" })
+      expect(discoveredInstructions).toEqual([])
     }),
   )
 })

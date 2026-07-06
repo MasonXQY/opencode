@@ -10,7 +10,7 @@ import { Image } from "../image"
 import { Location } from "../location"
 import { LocationMutation } from "../location-mutation"
 import { PermissionV2 } from "../permission"
-import { SessionInstructions } from "../session/instructions"
+import { InstructionDiscovery } from "../instruction-discovery"
 import { AbsolutePath } from "../schema"
 import { ReadToolFileSystem } from "./read-filesystem"
 import { Tool } from "./tool"
@@ -37,7 +37,7 @@ export const Plugin = {
     const mutation = yield* LocationMutation.Service
     const image = yield* Image.Service
     const permission = yield* PermissionV2.Service
-    const sessionInstructions = yield* SessionInstructions.Service
+    const instructionDiscovery = yield* InstructionDiscovery.Service
     const fs = yield* FSUtil.Service
     const location = yield* Location.Service
 
@@ -90,36 +90,35 @@ export const Plugin = {
                       offset: input.offset,
                       limit: input.limit,
                     })
-              // After a successful read, discover nearby AGENTS.md walking up to the Location
-              // root exclusive and inject them as durable synthetic instructions. For a
-              // directory listing the walk starts at the directory itself (so its own AGENTS.md
-              // is discovered); for a file it starts at the file's dirname. External reads are
-              // skipped, and discovery failures never fail the read.
-              yield* Effect.gen(function* () {
+              const discoverInstructions = Effect.gen(function* () {
                 if (target.externalDirectory !== undefined) return
                 const resolved = yield* fs.resolve(target.canonical)
                 const root = yield* fs.resolve(location.directory)
-                // up() searches its stop directory, so the Location-root AGENTS.md (already
-                // supplied by the core/instructions baseline) is dropped by the dirname filter.
                 const discovered = yield* fs.up({
                   targets: [FILENAME],
                   start: type === "directory" ? resolved : dirname(resolved),
                   stop: root,
                 })
-                const candidates = (yield* Effect.forEach(discovered, fs.resolve)).filter((file) => dirname(file) !== root)
+                const candidates = (yield* Effect.forEach(discovered, fs.resolve)).filter(
+                  (file) => dirname(file) !== root,
+                )
                 if (candidates.length === 0) return
-                yield* sessionInstructions.load({ sessionID: context.sessionID, paths: candidates })
-              }).pipe(
-                Effect.catch(() => Effect.void),
-                Effect.catchDefect(() => Effect.void),
-              )
+                yield* instructionDiscovery.discover({
+                  sessionID: context.sessionID,
+                  assistantMessageID: context.assistantMessageID,
+                  paths: candidates,
+                })
+              }).pipe(Effect.catch(() => Effect.void))
               if ("encoding" in content && content.encoding === "base64" && SUPPORTED_IMAGE_MIMES.has(content.mime)) {
-                return yield* image
+                const normalized = yield* image
                   .normalize(resource, { ...content, encoding: "base64" })
                   .pipe(Effect.catchTag("Image.ResizerUnavailableError", () => Effect.succeed(content)))
+                yield* discoverInstructions
+                return normalized
               }
               if ("encoding" in content && content.encoding === "base64")
                 return yield* Effect.fail(new ReadToolFileSystem.BinaryFileError({ resource }))
+              yield* discoverInstructions
               return content
             }).pipe(
               Effect.mapError((error) => {

@@ -1,5 +1,20 @@
 # V2 Schema Changelog
 
+## 2026-07-05: Rename Session Context Contracts To Instructions
+
+- Rename the System Context algebra to `Instructions`, API-managed `SessionContextEntry` records to `InstructionEntry`, and the session-owned context checkpoint to `InstructionCheckpoint`.
+- Rename the durable update event from `session.context.updated` to `session.instructions.updated`.
+- Rename the API-managed entry routes from `/api/session/:sessionID/context-entry` to `/api/session/:sessionID/instructions` and their operation identifiers from `session.context.entry.*` to `session.instructions.*`.
+- Add durable per-Session path-local instruction files and make `InstructionDiscovery` combine them with ambient global and upward-project `AGENTS.md` files.
+- Record successful path-local discovery as `session.instructions.discovered`; projection stores frozen file content with the owning assistant-message boundary before `InstructionCheckpoint` admits it.
+- Remove the context registry seam. The runner explicitly composes instruction built-ins, discovery, selected-agent skill guidance, reference guidance, MCP guidance, and `InstructionEntry` values.
+
+Compatibility:
+
+- The V2 contracts remain experimental. The renamed tables, event, endpoints, schemas, and generated client names are intentionally breaking changes for beta consumers.
+- Existing changelog entries retain the names that were accurate when those changes occurred.
+- Previously emitted synthetic instruction messages remain historical Session history. New discoveries use the instruction checkpoint path; the migration does not infer structured files from old free-form synthetic text.
+
 ## 2026-07-03: Require Durable Envelope On Durable Events
 
 - Make the wire `durable` envelope required on durable event definitions.

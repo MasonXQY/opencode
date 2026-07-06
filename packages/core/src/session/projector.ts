@@ -1,6 +1,6 @@
 export * as SessionProjector from "./projector"
 
-import { and, asc, desc, eq, gt, inArray, lt, or, sql } from "drizzle-orm"
+import { and, asc, desc, eq, gt, inArray, lt, ne, or, sql } from "drizzle-orm"
 import { DateTime, Effect, Layer, Schema } from "effect"
 import { Database } from "../database/database"
 import { EventV2 } from "../event"
@@ -13,16 +13,17 @@ import { SessionMessage } from "./message"
 import { SessionMessageUpdater } from "./message-updater"
 import { SessionInput } from "./input"
 import { WorkspaceV2 } from "../workspace"
-import { SessionContextCheckpoint } from "./context-checkpoint"
+import { InstructionCheckpoint } from "./instruction-checkpoint"
 import {
   MessageTable,
   PartTable,
-  SessionContextCheckpointTable,
+  InstructionCheckpointTable,
+  InstructionFileTable,
   SessionInputTable,
   SessionMessageTable,
   SessionTable,
 } from "./sql"
-import type { DeepMutable } from "../schema"
+import { AbsolutePath, type DeepMutable } from "../schema"
 import { Slug } from "../util/slug"
 
 type DatabaseService = Database.Interface["db"]
@@ -218,16 +219,40 @@ const projectFork = Effect.fn("SessionProjector.projectFork")(function* (
   // The fork inherits the parent's transcript, so it inherits the context
   // checkpoint that transcript was built against: copied message seqs keep
   // folding at the same baseline horizon.
-  const checkpoint = yield* db
-    .select()
-    .from(SessionContextCheckpointTable)
-    .where(eq(SessionContextCheckpointTable.session_id, event.data.parentID))
-    .get()
-    .pipe(Effect.orDie)
+  const checkpoint = event.data.from
+    ? undefined
+    : yield* db
+        .select()
+        .from(InstructionCheckpointTable)
+        .where(eq(InstructionCheckpointTable.session_id, event.data.parentID))
+        .get()
+        .pipe(Effect.orDie)
   if (checkpoint) {
     yield* db
-      .insert(SessionContextCheckpointTable)
+      .insert(InstructionCheckpointTable)
       .values({ ...checkpoint, session_id: event.data.sessionID })
+      .run()
+      .pipe(Effect.orDie)
+  }
+
+  const instructionFiles =
+    copiedSeq === 0
+      ? []
+      : yield* db
+          .select()
+          .from(InstructionFileTable)
+          .where(
+            and(
+              eq(InstructionFileTable.session_id, event.data.parentID),
+              lt(InstructionFileTable.message_seq, copiedSeq + 1),
+            ),
+          )
+          .all()
+          .pipe(Effect.orDie)
+  if (instructionFiles.length > 0) {
+    yield* db
+      .insert(InstructionFileTable)
+      .values(instructionFiles.map((file) => ({ ...file, session_id: event.data.sessionID })))
       .run()
       .pipe(Effect.orDie)
   }
@@ -243,6 +268,7 @@ const projectFork = Effect.fn("SessionProjector.projectFork")(function* (
           eq(SessionMessageTable.session_id, event.data.parentID),
           gt(SessionMessageTable.seq, cursor),
           copiedSeq === 0 ? undefined : lt(SessionMessageTable.seq, copiedSeq + 1),
+          event.data.from ? ne(SessionMessageTable.type, "system") : undefined,
         ),
       )
       .orderBy(asc(SessionMessageTable.seq))
@@ -331,7 +357,8 @@ const projectFork = Effect.fn("SessionProjector.projectFork")(function* (
     .where(eq(SessionTable.id, event.data.sessionID))
     .run()
     .pipe(Effect.orDie)
-  if (copiedSeq > 0) yield* EventV2.reserveSequence(db, event.data.sessionID, copiedSeq)
+  const inheritedSeq = Math.max(copiedSeq, ...instructionFiles.map((file) => file.discovered_seq))
+  if (inheritedSeq > 0) yield* EventV2.reserveSequence(db, event.data.sessionID, inheritedSeq)
 })
 
 function run(db: DatabaseService, event: MessageEvent) {
@@ -497,7 +524,12 @@ const layer = Layer.effectDiscard(
           .where(eq(SessionTable.id, event.data.sessionID))
           .run()
           .pipe(Effect.orDie)
-        yield* SessionContextCheckpoint.reset(db, event.data.sessionID)
+        yield* InstructionCheckpoint.reset(db, event.data.sessionID)
+        yield* db
+          .delete(InstructionFileTable)
+          .where(eq(InstructionFileTable.session_id, event.data.sessionID))
+          .run()
+          .pipe(Effect.orDie)
       }),
     )
     yield* events.project(SessionV1.Event.Deleted, (event) =>
@@ -634,7 +666,55 @@ const layer = Layer.effectDiscard(
         })
       }),
     )
-    yield* events.project(SessionEvent.ContextUpdated, (event) => run(db, event))
+    yield* events.project(SessionEvent.InstructionsUpdated, (event) => run(db, event))
+    yield* events.project(SessionEvent.InstructionsDiscovered, (event) =>
+      Effect.gen(function* () {
+        if (event.durable === undefined)
+          return yield* Effect.die(new Error("Durable instruction discovery is missing aggregate sequence"))
+        const session = yield* db
+          .select({ directory: SessionTable.directory, workspaceID: SessionTable.workspace_id })
+          .from(SessionTable)
+          .where(eq(SessionTable.id, event.data.sessionID))
+          .get()
+          .pipe(Effect.orDie)
+        if (
+          !session ||
+          session.directory !== event.data.location.directory ||
+          (session.workspaceID ?? undefined) !== event.data.location.workspaceID
+        )
+          return
+        const message = yield* db
+          .select({ seq: SessionMessageTable.seq })
+          .from(SessionMessageTable)
+          .where(
+            and(
+              eq(SessionMessageTable.session_id, event.data.sessionID),
+              eq(SessionMessageTable.id, event.data.assistantMessageID),
+            ),
+          )
+          .get()
+          .pipe(Effect.orDie)
+        if (!message)
+          return yield* Effect.die(
+            new Error(`Instruction discovery message not found: ${event.data.assistantMessageID}`),
+          )
+        yield* db
+          .insert(InstructionFileTable)
+          .values(
+            event.data.files.map((file, position) => ({
+              session_id: event.data.sessionID,
+              path: AbsolutePath.make(file.path),
+              content: file.content,
+              message_seq: message.seq,
+              discovered_seq: event.durable!.seq,
+              position,
+            })),
+          )
+          .onConflictDoNothing()
+          .run()
+          .pipe(Effect.orDie)
+      }),
+    )
     yield* events.project(SessionEvent.Synthetic, (event) => run(db, event))
     yield* events.project(SessionEvent.Skill.Activated, (event) =>
       insertMessage(db, event, {
@@ -718,7 +798,17 @@ const layer = Layer.effectDiscard(
           .where(eq(SessionTable.id, event.data.sessionID))
           .run()
           .pipe(Effect.orDie)
-        yield* SessionContextCheckpoint.reset(db, event.data.sessionID)
+        yield* InstructionCheckpoint.reset(db, event.data.sessionID)
+        yield* db
+          .delete(InstructionFileTable)
+          .where(
+            and(
+              eq(InstructionFileTable.session_id, event.data.sessionID),
+              gt(InstructionFileTable.message_seq, boundary.seq),
+            ),
+          )
+          .run()
+          .pipe(Effect.orDie)
       }),
     )
   }),

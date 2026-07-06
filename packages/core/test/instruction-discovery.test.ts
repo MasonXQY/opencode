@@ -1,15 +1,24 @@
 import { describe, expect } from "bun:test"
-import { Effect, Layer } from "effect"
+import { DateTime, Effect, Layer, Schema } from "effect"
 import fs from "fs/promises"
 import path from "path"
+import { Database } from "@opencode-ai/core/database/database"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Global } from "@opencode-ai/core/global"
-import { InstructionContext } from "@opencode-ai/core/instruction-context"
+import { InstructionDiscovery } from "@opencode-ai/core/instruction-discovery"
+import { Instructions } from "@opencode-ai/core/instructions"
 import { Location } from "@opencode-ai/core/location"
+import { ModelV2 } from "@opencode-ai/core/model"
+import { Project } from "@opencode-ai/core/project"
+import { ProjectTable } from "@opencode-ai/core/project/sql"
+import { ProviderV2 } from "@opencode-ai/core/provider"
 import { AbsolutePath } from "@opencode-ai/core/schema"
-import { SystemContext } from "@opencode-ai/core/system-context"
+import { SessionV2 } from "@opencode-ai/core/session"
+import { SessionMessage } from "@opencode-ai/core/session/message"
+import { SessionProjector } from "@opencode-ai/core/session/projector"
+import { InstructionFileTable, SessionMessageTable, SessionTable } from "@opencode-ai/core/session/sql"
 import { location } from "./fixture/location"
 import { tmpdir } from "./fixture/tmpdir"
 import { testEffect } from "./lib/effect"
@@ -21,13 +30,83 @@ const instructionLayer = (input: {
   locationServiceLayer: Layer.Layer<Location.Service>
   filesystemLayer?: Layer.Layer<FSUtil.Service>
 }) =>
-  AppNodeBuilder.build(InstructionContext.node, [
+  AppNodeBuilder.build(InstructionDiscovery.node, [
     [Global.node, Global.layerWith({ config: input.config })],
     [Location.node, input.locationServiceLayer],
     ...(input.filesystemLayer ? [[FSUtil.node, input.filesystemLayer] as const] : []),
   ])
 
-describe("InstructionContext", () => {
+const sessionID = SessionV2.ID.make("ses_instruction_discovery_test")
+const assistantMessageID = SessionMessage.ID.make("msg_instruction_discovery")
+
+const durableLayer = (input: { config: string; directory: string }) =>
+  AppNodeBuilder.build(LayerNode.group([Database.node, InstructionDiscovery.node, SessionProjector.node]), [
+    [Global.node, Global.layerWith({ config: input.config })],
+    [
+      Location.node,
+      Layer.succeed(Location.Service, Location.Service.of(location({ directory: AbsolutePath.make(input.directory) }))),
+    ],
+  ])
+
+const withDurableDiscovery = <A, E, R>(
+  run: (input: { directory: string; config: string; sessionID: SessionV2.ID }) => Effect.Effect<A, E, R>,
+) =>
+  Effect.acquireRelease(
+    Effect.promise(() => tmpdir()),
+    (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
+  ).pipe(
+    Effect.flatMap((tmp) => {
+      const directory = path.join(tmp.path, "project")
+      const config = path.join(tmp.path, "global")
+      return Effect.promise(() =>
+        Promise.all([fs.mkdir(directory, { recursive: true }), fs.mkdir(config, { recursive: true })]),
+      ).pipe(
+        Effect.andThen(
+          Effect.gen(function* () {
+            const sessionID = SessionV2.ID.create()
+            const { db } = yield* Database.Service
+            yield* db
+              .insert(ProjectTable)
+              .values({ id: Project.ID.global, worktree: AbsolutePath.make(directory), sandboxes: [] })
+              .run()
+              .pipe(Effect.orDie)
+            yield* db
+              .insert(SessionTable)
+              .values({
+                id: sessionID,
+                project_id: Project.ID.global,
+                slug: sessionID,
+                directory: AbsolutePath.make(directory),
+                title: "instruction discovery",
+                version: "test",
+              })
+              .run()
+              .pipe(Effect.orDie)
+            const encoded = Schema.encodeSync(SessionMessage.Message)(
+              SessionMessage.Assistant.make({
+                id: assistantMessageID,
+                type: "assistant",
+                agent: "build",
+                model: { id: ModelV2.ID.make("model"), providerID: ProviderV2.ID.make("provider") },
+                content: [],
+                time: { created: DateTime.makeUnsafe(0) },
+              }),
+            )
+            const { id: _, type, ...data } = encoded
+            yield* db
+              .insert(SessionMessageTable)
+              .values({ id: assistantMessageID, session_id: sessionID, type, seq: 1, time_created: 0, data })
+              .run()
+              .pipe(Effect.orDie)
+            return yield* run({ directory, config, sessionID })
+          }),
+        ),
+        Effect.provide(durableLayer({ directory, config })),
+      )
+    }),
+  )
+
+describe("InstructionDiscovery", () => {
   it.live("loads global and upward project AGENTS.md files as one aggregate context", () =>
     Effect.acquireRelease(
       Effect.promise(() => tmpdir()),
@@ -51,8 +130,8 @@ describe("InstructionContext", () => {
             await fs.writeFile(packageFile, "package")
           })
 
-          const load = InstructionContext.Service.pipe(
-            Effect.flatMap((service) => service.load()),
+          const load = InstructionDiscovery.Service.pipe(
+            Effect.flatMap((service) => service.load(sessionID)),
             Effect.provide(
               instructionLayer({
                 config: global,
@@ -69,7 +148,7 @@ describe("InstructionContext", () => {
             ),
           )
 
-          const initialized = yield* SystemContext.initialize(yield* load)
+          const initialized = yield* Instructions.initialize(yield* load)
           expect(initialized.text).toBe(
             [
               `Instructions from: ${globalFile}\nglobal`,
@@ -80,17 +159,17 @@ describe("InstructionContext", () => {
           expect(initialized.text).not.toContain("outside")
 
           yield* Effect.promise(() => fs.writeFile(packageFile, "changed"))
-          expect(yield* SystemContext.reconcile(yield* load, initialized.applied)).toMatchObject({
+          expect(yield* Instructions.reconcile(yield* load, initialized.applied)).toMatchObject({
             _tag: "Updated",
             text: expect.stringContaining(`Instructions from: ${packageFile}\nchanged`),
           })
 
           yield* Effect.promise(() => fs.rm(packageFile))
-          const partial = yield* SystemContext.reconcile(yield* load, initialized.applied)
+          const partial = yield* Instructions.reconcile(yield* load, initialized.applied)
           expect(partial).toEqual({
             _tag: "Updated",
             text: [
-              "These instructions replace all previously loaded ambient instructions.",
+              "These instructions replace all previously loaded instructions.",
               `Instructions from: ${globalFile}\nglobal`,
               `Instructions from: ${projectFile}\nproject`,
             ].join("\n\n"),
@@ -98,7 +177,7 @@ describe("InstructionContext", () => {
           })
 
           yield* Effect.promise(() => Promise.all([fs.rm(globalFile), fs.rm(projectFile)]))
-          expect(yield* SystemContext.reconcile(yield* load, initialized.applied)).toEqual({
+          expect(yield* Instructions.reconcile(yield* load, initialized.applied)).toEqual({
             _tag: "Updated",
             text: "Previously loaded instructions no longer apply.",
             applied: {},
@@ -117,8 +196,8 @@ describe("InstructionContext", () => {
         Effect.gen(function* () {
           const file = path.join(tmp.path, "AGENTS.md")
           yield* Effect.promise(() => fs.writeFile(file, ""))
-          const context = yield* InstructionContext.Service.pipe(
-            Effect.flatMap((service) => service.load()),
+          const context = yield* InstructionDiscovery.Service.pipe(
+            Effect.flatMap((service) => service.load(sessionID)),
             Effect.provide(
               instructionLayer({
                 config: path.join(tmp.path, "global"),
@@ -130,9 +209,100 @@ describe("InstructionContext", () => {
             ),
           )
 
-          expect((yield* SystemContext.initialize(context)).text).toBe(`Instructions from: ${file}\n`)
+          expect((yield* Instructions.initialize(context)).text).toBe(`Instructions from: ${file}\n`)
         }),
       ),
+    ),
+  )
+
+  it.live("stores discovered file content at admission time", () =>
+    withDurableDiscovery(({ directory, sessionID }) =>
+      Effect.gen(function* () {
+        const file = path.join(directory, "src", "AGENTS.md")
+        yield* Effect.promise(() => fs.mkdir(path.dirname(file), { recursive: true }))
+        yield* Effect.promise(() => fs.writeFile(file, "frozen"))
+        const discovery = yield* InstructionDiscovery.Service
+
+        yield* discovery.discover({ sessionID, assistantMessageID, paths: [file] })
+        yield* Effect.promise(() => fs.writeFile(file, "changed"))
+
+        const database = yield* Database.Service
+        expect(yield* database.db.select().from(InstructionFileTable).all().pipe(Effect.orDie)).toMatchObject([
+          { session_id: sessionID, path: file, content: "frozen" },
+        ])
+      }),
+    ),
+  )
+
+  it.live("deduplicates repeated and parallel discovery", () =>
+    withDurableDiscovery(({ directory, sessionID }) =>
+      Effect.gen(function* () {
+        const first = path.join(directory, "one", "AGENTS.md")
+        const second = path.join(directory, "two", "AGENTS.md")
+        yield* Effect.promise(() =>
+          Promise.all([
+            fs.mkdir(path.dirname(first), { recursive: true }).then(() => fs.writeFile(first, "one")),
+            fs.mkdir(path.dirname(second), { recursive: true }).then(() => fs.writeFile(second, "two")),
+          ]),
+        )
+        const discovery = yield* InstructionDiscovery.Service
+
+        yield* Effect.all(
+          [
+            discovery.discover({ sessionID, assistantMessageID, paths: [first, first, second] }),
+            discovery.discover({ sessionID, assistantMessageID, paths: [second, first] }),
+            discovery.discover({ sessionID, assistantMessageID, paths: [first] }),
+          ],
+          { concurrency: "unbounded" },
+        )
+        yield* discovery.discover({ sessionID, assistantMessageID, paths: [first, second, first] })
+
+        const database = yield* Database.Service
+        const rows = yield* database.db
+          .select({ path: InstructionFileTable.path })
+          .from(InstructionFileTable)
+          .all()
+          .pipe(Effect.orDie)
+        expect(rows.map((row) => row.path).sort()).toEqual(
+          [AbsolutePath.make(first), AbsolutePath.make(second)].sort(),
+        )
+      }),
+    ),
+  )
+
+  it.live("loads ambient and stored instructions together", () =>
+    withDurableDiscovery(({ directory, sessionID }) =>
+      Effect.gen(function* () {
+        const ambient = path.join(directory, "AGENTS.md")
+        const stored = path.join(directory, "src", "AGENTS.md")
+        yield* Effect.promise(() => fs.writeFile(ambient, "ambient"))
+        yield* Effect.promise(() => fs.mkdir(path.dirname(stored), { recursive: true }))
+        yield* Effect.promise(() => fs.writeFile(stored, "stored"))
+        const discovery = yield* InstructionDiscovery.Service
+
+        yield* discovery.discover({ sessionID, assistantMessageID, paths: [stored] })
+
+        expect((yield* Instructions.initialize(yield* discovery.load(sessionID))).text).toBe(
+          `Instructions from: ${ambient}\nambient\n\nInstructions from: ${stored}\nstored`,
+        )
+      }),
+    ),
+  )
+
+  it.live("does not emit synthetic messages during discovery", () =>
+    withDurableDiscovery(({ directory, sessionID }) =>
+      Effect.gen(function* () {
+        const file = path.join(directory, "src", "AGENTS.md")
+        yield* Effect.promise(() => fs.mkdir(path.dirname(file), { recursive: true }))
+        yield* Effect.promise(() => fs.writeFile(file, "stored"))
+
+        const discovery = yield* InstructionDiscovery.Service
+        yield* discovery.discover({ sessionID, assistantMessageID, paths: [file] })
+
+        const database = yield* Database.Service
+        const messages = yield* database.db.select().from(SessionMessageTable).all().pipe(Effect.orDie)
+        expect(messages.filter((message) => message.type === "synthetic")).toEqual([])
+      }),
     ),
   )
 
@@ -146,8 +316,8 @@ describe("InstructionContext", () => {
           ),
         ),
       ).pipe(Layer.provide(LayerNode.compile(FSUtil.node)))
-      const context = yield* InstructionContext.Service.pipe(
-        Effect.flatMap((service) => service.load()),
+      const context = yield* InstructionDiscovery.Service.pipe(
+        Effect.flatMap((service) => service.load(sessionID)),
         Effect.provide(
           instructionLayer({
             config: "/global",
@@ -161,7 +331,7 @@ describe("InstructionContext", () => {
       )
 
       expect(
-        yield* SystemContext.reconcile(context, {
+        yield* Instructions.reconcile(context, {
           "core/instructions": {
             value: [{ path: "/repo/AGENTS.md", content: "old" }],
             removed: "Previously loaded instructions no longer apply.",
@@ -186,8 +356,8 @@ describe("InstructionContext", () => {
           ),
         ),
       ).pipe(Layer.provide(LayerNode.compile(FSUtil.node)))
-      const context = yield* InstructionContext.Service.pipe(
-        Effect.flatMap((service) => service.load()),
+      const context = yield* InstructionDiscovery.Service.pipe(
+        Effect.flatMap((service) => service.load(sessionID)),
         Effect.provide(
           instructionLayer({
             config: "/global",
@@ -201,7 +371,7 @@ describe("InstructionContext", () => {
       )
 
       expect(
-        yield* SystemContext.reconcile(context, {
+        yield* Instructions.reconcile(context, {
           "core/instructions": {
             value: [{ path: file, content: "old" }],
             removed: "Previously loaded instructions no longer apply.",
@@ -230,8 +400,8 @@ describe("InstructionContext", () => {
         ),
       ).pipe(Layer.provide(LayerNode.compile(FSUtil.node)))
 
-      yield* InstructionContext.Service.pipe(
-        Effect.flatMap((service) => service.load()),
+      yield* InstructionDiscovery.Service.pipe(
+        Effect.flatMap((service) => service.load(sessionID)),
         Effect.provide(
           instructionLayer({
             config: "/global",
@@ -260,8 +430,8 @@ describe("InstructionContext", () => {
       let scanned = false
       process.env.OPENCODE_DISABLE_PROJECT_CONFIG = "1"
 
-      yield* InstructionContext.Service.pipe(
-        Effect.flatMap((service) => service.load()),
+      yield* InstructionDiscovery.Service.pipe(
+        Effect.flatMap((service) => service.load(sessionID)),
         Effect.provide(
           instructionLayer({
             config: "/global",
@@ -292,8 +462,8 @@ describe("InstructionContext", () => {
   it.effect("does not discover project instructions outside the canonical project root", () =>
     Effect.gen(function* () {
       let scanned = false
-      yield* InstructionContext.Service.pipe(
-        Effect.flatMap((service) => service.load()),
+      yield* InstructionDiscovery.Service.pipe(
+        Effect.flatMap((service) => service.load(sessionID)),
         Effect.provide(
           instructionLayer({
             config: "/global",

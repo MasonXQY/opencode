@@ -10,6 +10,7 @@ import { ModelV2 } from "@opencode-ai/core/model"
 import { Project } from "@opencode-ai/core/project"
 import { ProjectTable } from "@opencode-ai/core/project/sql"
 import { ProviderV2 } from "@opencode-ai/core/provider"
+import { Location } from "@opencode-ai/core/location"
 import { AbsolutePath } from "@opencode-ai/core/schema"
 import { SessionV2 } from "@opencode-ai/core/session"
 import { SessionEvent } from "@opencode-ai/core/session/event"
@@ -21,7 +22,8 @@ import { SessionExecution } from "@opencode-ai/core/session/execution"
 import { SessionInput } from "@opencode-ai/core/session/input"
 import { Shell } from "@opencode-ai/schema/shell"
 import {
-  SessionContextCheckpointTable,
+  InstructionCheckpointTable,
+  InstructionFileTable,
   SessionInputTable,
   SessionMessageTable,
   SessionTable,
@@ -50,6 +52,13 @@ const assistantRow = (
   return { id, session_id: sessionID, type, seq, time_created: DateTime.toEpochMillis(time.created), data }
 }
 
+const systemRow = (id: SessionMessage.ID, seq: number) => {
+  const { id: _, type, ...data } = encodeMessage(
+    SessionMessage.System.make({ id, type: "system", text: "historical update", time: { created } }),
+  )
+  return { id, session_id: sessionID, type, seq, time_created: DateTime.toEpochMillis(created), data }
+}
+
 describe("SessionProjector", () => {
   it.effect("projects staged, cleared, and committed reverts", () =>
     Effect.gen(function* () {
@@ -75,7 +84,7 @@ describe("SessionProjector", () => {
         .values([assistantRow(boundary, 1), assistantRow(SessionMessage.ID.make("msg_later"), 2)])
         .run()
       yield* db
-        .insert(SessionContextCheckpointTable)
+        .insert(InstructionCheckpointTable)
         .values({ session_id: sessionID, baseline: "baseline", snapshot: {}, baseline_seq: 0 })
         .run()
       const events = yield* EventV2.Service
@@ -102,7 +111,219 @@ describe("SessionProjector", () => {
         (yield* db.select({ id: SessionMessageTable.id }).from(SessionMessageTable).all()).map((row) => row.id),
       ).toEqual([boundary])
       // A committed revert resets the context checkpoint so the next turn re-initializes.
-      expect(yield* db.select().from(SessionContextCheckpointTable).get().pipe(Effect.orDie)).toBeUndefined()
+      expect(yield* db.select().from(InstructionCheckpointTable).get().pipe(Effect.orDie)).toBeUndefined()
+    }),
+  )
+
+  it.effect("copies only instruction files admitted within a fork boundary", () =>
+    Effect.gen(function* () {
+      const db = (yield* Database.Service).db
+      yield* db
+        .insert(ProjectTable)
+        .values({ id: Project.ID.global, worktree: AbsolutePath.make("/project"), sandboxes: [] })
+        .run()
+      yield* db
+        .insert(SessionTable)
+        .values({
+          id: sessionID,
+          project_id: Project.ID.global,
+          slug: "test",
+          directory: "/project",
+          title: "test",
+          version: "test",
+        })
+        .run()
+      const boundary = SessionMessage.ID.make("msg_fork_boundary")
+      yield* db
+        .insert(SessionMessageTable)
+        .values([
+          assistantRow(SessionMessage.ID.make("msg_copied"), 2),
+          systemRow(SessionMessage.ID.make("msg_instruction_update"), 3),
+          assistantRow(boundary, 4),
+        ])
+        .run()
+      yield* db
+        .insert(InstructionCheckpointTable)
+        .values({ session_id: sessionID, baseline: "future", snapshot: {}, baseline_seq: 4 })
+        .run()
+      yield* db
+        .insert(InstructionFileTable)
+        .values([
+          {
+            session_id: sessionID,
+            path: AbsolutePath.make("/project/early.md"),
+            content: "early",
+            message_seq: 1,
+            discovered_seq: 1,
+            position: 0,
+          },
+          {
+            session_id: sessionID,
+            path: AbsolutePath.make("/project/edge.md"),
+            content: "edge",
+            message_seq: 2,
+            discovered_seq: 2,
+            position: 1,
+          },
+          {
+            session_id: sessionID,
+            path: AbsolutePath.make("/project/late.md"),
+            content: "late",
+            message_seq: 4,
+            discovered_seq: 3,
+            position: 2,
+          },
+        ])
+        .run()
+      const forkedID = SessionV2.ID.make("ses_projector_fork")
+
+      const events = yield* EventV2.Service
+      yield* events.publish(SessionEvent.Forked, {
+        sessionID: forkedID,
+        parentID: sessionID,
+        from: boundary,
+      })
+
+      expect(
+        yield* db
+          .select({ path: InstructionFileTable.path, message_seq: InstructionFileTable.message_seq })
+          .from(InstructionFileTable)
+          .where(eq(InstructionFileTable.session_id, forkedID))
+          .orderBy(asc(InstructionFileTable.message_seq))
+          .all(),
+      ).toEqual([
+        { path: AbsolutePath.make("/project/early.md"), message_seq: 1 },
+        { path: AbsolutePath.make("/project/edge.md"), message_seq: 2 },
+      ])
+      expect(
+        yield* db
+          .select()
+          .from(InstructionCheckpointTable)
+          .where(eq(InstructionCheckpointTable.session_id, forkedID))
+          .get(),
+      ).toBeUndefined()
+      expect(
+        yield* db
+          .select({ type: SessionMessageTable.type })
+          .from(SessionMessageTable)
+          .where(eq(SessionMessageTable.session_id, forkedID))
+          .all(),
+      ).toEqual([{ type: "assistant" }])
+    }),
+  )
+
+  it.effect("clears admitted instruction files when a session moves", () =>
+    Effect.gen(function* () {
+      const db = (yield* Database.Service).db
+      yield* db
+        .insert(ProjectTable)
+        .values({ id: Project.ID.global, worktree: AbsolutePath.make("/project"), sandboxes: [] })
+        .run()
+      yield* db
+        .insert(SessionTable)
+        .values({
+          id: sessionID,
+          project_id: Project.ID.global,
+          slug: "test",
+          directory: "/project",
+          title: "test",
+          version: "test",
+        })
+        .run()
+      yield* db
+        .insert(InstructionFileTable)
+        .values({
+          session_id: sessionID,
+          path: AbsolutePath.make("/project/AGENTS.md"),
+          content: "instructions",
+          message_seq: 1,
+          discovered_seq: 1,
+          position: 0,
+        })
+        .run()
+
+      const events = yield* EventV2.Service
+      yield* events.publish(SessionEvent.Moved, {
+        sessionID,
+        location: Location.Ref.make({ directory: AbsolutePath.make("/moved") }),
+      })
+
+      expect(
+        yield* db.select().from(InstructionFileTable).where(eq(InstructionFileTable.session_id, sessionID)).all(),
+      ).toEqual([])
+    }),
+  )
+
+  it.effect("removes only instruction files admitted after a committed revert boundary", () =>
+    Effect.gen(function* () {
+      const db = (yield* Database.Service).db
+      yield* db
+        .insert(ProjectTable)
+        .values({ id: Project.ID.global, worktree: AbsolutePath.make("/project"), sandboxes: [] })
+        .run()
+      yield* db
+        .insert(SessionTable)
+        .values({
+          id: sessionID,
+          project_id: Project.ID.global,
+          slug: "test",
+          directory: "/project",
+          title: "test",
+          version: "test",
+        })
+        .run()
+      const boundary = SessionMessage.ID.make("msg_instruction_boundary")
+      yield* db
+        .insert(SessionMessageTable)
+        .values([assistantRow(boundary, 2), assistantRow(SessionMessage.ID.make("msg_instruction_later"), 4)])
+        .run()
+      yield* db
+        .insert(InstructionFileTable)
+        .values([
+          {
+            session_id: sessionID,
+            path: AbsolutePath.make("/project/early.md"),
+            content: "early",
+            message_seq: 1,
+            discovered_seq: 1,
+            position: 0,
+          },
+          {
+            session_id: sessionID,
+            path: AbsolutePath.make("/project/edge.md"),
+            content: "edge",
+            message_seq: 2,
+            discovered_seq: 2,
+            position: 1,
+          },
+          {
+            session_id: sessionID,
+            path: AbsolutePath.make("/project/late.md"),
+            content: "late",
+            message_seq: 3,
+            discovered_seq: 3,
+            position: 2,
+          },
+        ])
+        .run()
+
+      const events = yield* EventV2.Service
+      yield* events.publish(SessionEvent.RevertEvent.Committed, {
+        sessionID,
+        messageID: boundary,
+      })
+
+      expect(
+        yield* db
+          .select({ path: InstructionFileTable.path, message_seq: InstructionFileTable.message_seq })
+          .from(InstructionFileTable)
+          .where(eq(InstructionFileTable.session_id, sessionID))
+          .orderBy(asc(InstructionFileTable.message_seq))
+          .all(),
+      ).toEqual([
+        { path: AbsolutePath.make("/project/early.md"), message_seq: 1 },
+        { path: AbsolutePath.make("/project/edge.md"), message_seq: 2 },
+      ])
     }),
   )
 
