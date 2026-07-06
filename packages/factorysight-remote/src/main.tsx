@@ -27,6 +27,7 @@ const tokenKey = "factorysight.remote.token"
 type LibraryTab = "agents" | "projects" | "files" | "artifacts"
 type ComposeMode = "swarm" | "direct"
 type Scale = "focused" | "balanced" | "wide"
+type WorkspaceView = "workflow" | "cli"
 type SpeechRecognitionResultLike = {
   isFinal: boolean
   0: { transcript: string }
@@ -263,6 +264,7 @@ function CanvasWorkspace(props: {
   const newestProjectId = createMemo(() => props.data.projects.at(-1)?.id)
   const [activeProjectId, setActiveProjectId] = createSignal(newestProjectId())
   const [libraryTab, setLibraryTab] = createSignal<LibraryTab>("agents")
+  const [workspaceView, setWorkspaceView] = createSignal<WorkspaceView>("workflow")
   const [composerFocusRequest, setComposerFocusRequest] = createSignal(0)
   const activeProject = createMemo(() => props.data.projects.find((project) => project.id === activeProjectId()))
   const projectTasks = createMemo(() =>
@@ -310,6 +312,8 @@ function CanvasWorkspace(props: {
         api={props.api}
         onRefresh={props.onRefresh}
         onLogout={props.onLogout}
+        view={workspaceView()}
+        onView={setWorkspaceView}
       />
       <section class="fs-stage">
         <ToolLibrary
@@ -329,18 +333,35 @@ function CanvasWorkspace(props: {
           onSelectTask={props.onSelectTask}
           onRefresh={props.onRefresh}
         />
-        <WorkflowCanvas
-          data={props.data}
-          project={activeProject()}
-          tasks={projectTasks()}
-          chainTasks={chainTasks()}
-          selectedTask={selectedTask()}
-          selectedTaskId={props.selectedTaskId}
-          counts={counts()}
-          onSelectTask={props.onSelectTask}
-          onRefresh={props.onRefresh}
-          onStartWorkflow={() => setComposerFocusRequest((value) => value + 1)}
-        />
+        <Show
+          when={workspaceView() === "cli"}
+          fallback={
+            <WorkflowCanvas
+              data={props.data}
+              project={activeProject()}
+              tasks={projectTasks()}
+              chainTasks={chainTasks()}
+              selectedTask={selectedTask()}
+              selectedTaskId={props.selectedTaskId}
+              counts={counts()}
+              onSelectTask={props.onSelectTask}
+              onRefresh={props.onRefresh}
+              onStartWorkflow={() => setComposerFocusRequest((value) => value + 1)}
+            />
+          }
+        >
+          <CliWorkspace
+            project={activeProject()}
+            tasks={projectTasks()}
+            chainTasks={chainTasks()}
+            selectedTask={selectedTask()}
+            selectedTaskId={props.selectedTaskId}
+            counts={counts()}
+            onSelectTask={props.onSelectTask}
+            onRefresh={props.onRefresh}
+            onStartWorkflow={() => setComposerFocusRequest((value) => value + 1)}
+          />
+        </Show>
         <NodeInspector
           data={props.data}
           api={props.api}
@@ -374,6 +395,8 @@ function TopBar(props: {
   api: ApiClient
   onRefresh: () => void
   onLogout: () => void
+  view: WorkspaceView
+  onView: (view: WorkspaceView) => void
 }) {
   return (
     <header class="topbar">
@@ -397,6 +420,22 @@ function TopBar(props: {
         <span>{props.data.backendMode === "factorysight" ? "FactorySight backend" : "Local backend"}</span>
       </div>
       <div class="top-actions">
+        <div class="view-toggle" aria-label="Workspace view">
+          <button
+            classList={{ active: props.view === "workflow" }}
+            aria-pressed={props.view === "workflow"}
+            onClick={() => props.onView("workflow")}
+          >
+            Workflow
+          </button>
+          <button
+            classList={{ active: props.view === "cli" }}
+            aria-pressed={props.view === "cli"}
+            onClick={() => props.onView("cli")}
+          >
+            CLI
+          </button>
+        </div>
         <PermissionControl
           project={props.project}
           profiles={props.data.permissionProfiles}
@@ -804,6 +843,108 @@ function CanvasEmpty() {
     <div class="canvas-empty">
       <strong>No workflow yet</strong>
       <span>Describe a mission in the command bar and FactorySight will create the agent chain.</span>
+    </div>
+  )
+}
+
+function CliWorkspace(props: {
+  project: Project | undefined
+  tasks: Task[]
+  chainTasks: Task[]
+  selectedTask: Task | undefined
+  selectedTaskId: string | undefined
+  counts: ReturnType<typeof taskCounts>
+  onSelectTask: (id: string) => void
+  onRefresh: () => void
+  onStartWorkflow: () => void
+}) {
+  const visibleTasks = createMemo(() => (props.chainTasks.length ? props.chainTasks : props.tasks.slice(0, 10)))
+  const selectedDigest = createMemo(() => eventDigest(props.selectedTask?.events ?? []))
+  const activeText = createMemo(
+    () =>
+      selectedDigest().deliverables.at(-1)?.text ??
+      selectedDigest().lastOutput ??
+      selectedDigest().lastStatus ??
+      "Select a task or launch a new mission to stream CLI-style progress here.",
+  )
+  return (
+    <section class="cli-shell">
+      <div class="cli-window">
+        <div class="cli-chrome" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
+        <div class="cli-topline">
+          <div class="cli-logo">F</div>
+          <span>CHAT</span>
+          <div class="cli-actions">
+            <button class="secondary" onClick={props.onRefresh}>
+              Sync
+            </button>
+            <button onClick={props.onStartWorkflow}>New task</button>
+          </div>
+        </div>
+        <div class="cli-thread">
+          <div class="cli-separator">
+            <span>{props.selectedTask ? "TASK ACTIVE" : "TASK INITIATED"}</span>
+          </div>
+          <div class="cli-context">
+            <button class="cli-context-row" onClick={props.onStartWorkflow}>
+              <span class="cli-bullet" />
+              <span>{props.project?.name ?? "No project selected"}</span>
+            </button>
+            <button class="cli-context-row" onClick={props.onRefresh}>
+              <span class="cli-bullet hollow" />
+              <span>
+                {props.counts.running} running / {props.counts.completed} completed / {props.counts.failed} failed
+              </span>
+            </button>
+          </div>
+          <Show when={visibleTasks().length} fallback={<CliEmpty onStartWorkflow={props.onStartWorkflow} />}>
+            <div class="cli-task-list">
+              <For each={visibleTasks()}>
+                {(task, index) => (
+                  <button
+                    class="cli-task-line"
+                    classList={{ active: task.id === props.selectedTaskId, failed: task.status === "failed" }}
+                    onClick={() => props.onSelectTask(task.id)}
+                  >
+                    <span class="cli-task-index">{String(index() + 1).padStart(2, "0")}</span>
+                    <span class={`cli-task-state ${task.status}`} />
+                    <span>
+                      <strong>{task.kind === "orchestration" ? "Primary planner" : task.title}</strong>
+                      <small>
+                        {taskStage(task)} / {task.agent} / {statusLabel(task.status)}
+                      </small>
+                    </span>
+                  </button>
+                )}
+              </For>
+            </div>
+          </Show>
+          <Show when={props.selectedTask}>
+            {(task) => (
+              <div class="cli-selected">
+                <div class="cli-prompt">{task().prompt.replace(/\n+/g, " ").slice(0, 140)}</div>
+                <div class="cli-output">
+                  <span class={`cli-dot ${task().status}`} />
+                  <p>{activeText()}</p>
+                </div>
+              </div>
+            )}
+          </Show>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function CliEmpty(props: { onStartWorkflow: () => void }) {
+  return (
+    <div class="cli-empty">
+      <span>No task stream yet.</span>
+      <button onClick={props.onStartWorkflow}>Start from mission input</button>
     </div>
   )
 }
