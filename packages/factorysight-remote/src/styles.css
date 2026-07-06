@@ -1074,6 +1074,16 @@ label {
   line-height: 14px;
 }
 
+.composer-error {
+  padding: 8px 10px;
+  border: 1px solid rgb(217 75 95 / 0.24);
+  border-radius: var(--radius-sm);
+  background: rgb(217 75 95 / 0.09);
+  color: #a73143;
+  font-size: 12px;
+  line-height: 16px;
+}
+
 .mission-options {
   min-width: 0;
   display: grid;

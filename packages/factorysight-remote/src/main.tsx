@@ -1,7 +1,13 @@
 import { render } from "solid-js/web"
 import { For, Show, createEffect, createMemo, createResource, createSignal, onCleanup } from "solid-js"
 import { ApiClient } from "./api"
-import { artifactsForProject, defaultProjectPath, nextSelectedTaskId } from "./view-model"
+import {
+  artifactsForProject,
+  defaultProjectPath,
+  nextSelectedTaskId,
+  preferredSpeechLanguage,
+  taskTitleFromPrompt,
+} from "./view-model"
 import {
   defaultPermissionLevel,
   preferredDefaultModel,
@@ -89,18 +95,6 @@ function formatBytes(size: number) {
   if (size < 1024) return `${size} B`
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
   return `${(size / 1024 / 1024).toFixed(1)} MB`
-}
-
-function taskTitleFromPrompt(value: string) {
-  const text = value
-    .replace(/\s+/g, " ")
-    .replace(/^[\s"'“”‘’`]+|[\s"'“”‘’`]+$/g, "")
-    .trim()
-  if (!text) return "Untitled mission"
-  const sentence = text.split(/(?<=[。！？.!?])\s+/)[0] ?? text
-  const cleaned = sentence.replace(/^(please|can you|could you|help me|帮我|请|麻烦你|你能否|能否)\s*/i, "").trim()
-  const title = cleaned || text
-  return title.length > 72 ? `${title.slice(0, 72).trim()}...` : title
 }
 
 function taskCounts(tasks: Task[]) {
@@ -269,6 +263,7 @@ function CanvasWorkspace(props: {
   const newestProjectId = createMemo(() => props.data.projects.at(-1)?.id)
   const [activeProjectId, setActiveProjectId] = createSignal(newestProjectId())
   const [libraryTab, setLibraryTab] = createSignal<LibraryTab>("agents")
+  const [composerFocusRequest, setComposerFocusRequest] = createSignal(0)
   const activeProject = createMemo(() => props.data.projects.find((project) => project.id === activeProjectId()))
   const projectTasks = createMemo(() =>
     props.data.tasks.filter((task) => task.projectId === activeProjectId() && task.status !== "archived"),
@@ -344,6 +339,7 @@ function CanvasWorkspace(props: {
           counts={counts()}
           onSelectTask={props.onSelectTask}
           onRefresh={props.onRefresh}
+          onStartWorkflow={() => setComposerFocusRequest((value) => value + 1)}
         />
         <NodeInspector
           data={props.data}
@@ -361,6 +357,7 @@ function CanvasWorkspace(props: {
         data={props.data}
         api={props.api}
         project={activeProject()}
+        focusRequest={composerFocusRequest()}
         onCreated={async (taskId) => {
           await props.onRefresh()
           props.onSelectTask(taskId)
@@ -703,6 +700,7 @@ function WorkflowCanvas(props: {
   counts: ReturnType<typeof taskCounts>
   onSelectTask: (id: string) => void
   onRefresh: () => void
+  onStartWorkflow: () => void
 }) {
   let nodeViewport: HTMLDivElement | undefined
   const percent = createMemo(() => progressValue(props.chainTasks.length ? props.chainTasks : props.tasks))
@@ -737,9 +735,9 @@ function WorkflowCanvas(props: {
         </div>
         <div class="run-controls">
           <button class="secondary" onClick={props.onRefresh}>
-            Test run
+            Sync status
           </button>
-          <button>Run workflow</button>
+          <button onClick={props.onStartWorkflow}>New workflow</button>
         </div>
       </div>
       <div class="canvas-toolbar">
@@ -1017,8 +1015,10 @@ function MissionCommandBar(props: {
   data: BootstrapData
   api: ApiClient
   project: Project | undefined
+  focusRequest: number
   onCreated: (taskId: string) => void | Promise<void>
 }) {
+  let promptInput: HTMLTextAreaElement | undefined
   const [mode, setMode] = createSignal<ComposeMode>("swarm")
   const [scale, setScale] = createSignal<Scale>("balanced")
   const [prompt, setPrompt] = createSignal("")
@@ -1034,6 +1034,7 @@ function MissionCommandBar(props: {
   const [busy, setBusy] = createSignal(false)
   const [listening, setListening] = createSignal(false)
   const [voiceError, setVoiceError] = createSignal("")
+  const [submitError, setSubmitError] = createSignal("")
   let recognition: SpeechRecognitionLike | undefined
   const speechCtor = () => {
     const speechWindow = window as Window &
@@ -1049,7 +1050,7 @@ function MissionCommandBar(props: {
     if (!next) return
     setPrompt((current) => (current.trim() ? `${current.trim()} ${next}` : next))
   }
-  const toggleVoiceInput = () => {
+  const toggleVoiceInput = async () => {
     setVoiceError("")
     if (listening()) {
       recognition?.stop()
@@ -1061,11 +1062,18 @@ function MissionCommandBar(props: {
       setVoiceError("Voice input is not supported in this browser.")
       return
     }
+    try {
+      const stream = await navigator.mediaDevices?.getUserMedia?.({ audio: true })
+      stream?.getTracks().forEach((track) => track.stop())
+    } catch {
+      setVoiceError("Microphone permission is blocked. Please allow microphone access and try again.")
+      return
+    }
     recognition?.abort()
     recognition = new Recognition()
     recognition.continuous = true
-    recognition.interimResults = false
-    recognition.lang = navigator.language || "en-US"
+    recognition.interimResults = true
+    recognition.lang = preferredSpeechLanguage(navigator.languages)
     recognition.onresult = (event) => {
       for (let index = event.resultIndex; index < event.results.length; index++) {
         const result = event.results[index]
@@ -1073,7 +1081,13 @@ function MissionCommandBar(props: {
       }
     }
     recognition.onerror = (event) => {
-      setVoiceError(event.error ? `Voice input stopped: ${event.error}` : "Voice input stopped.")
+      setVoiceError(
+        event.error === "no-speech"
+          ? "No speech was detected. Click Voice again and speak after the browser indicator appears."
+          : event.error
+            ? `Voice input stopped: ${event.error}`
+            : "Voice input stopped.",
+      )
       setListening(false)
     }
     recognition.onend = () => setListening(false)
@@ -1088,6 +1102,12 @@ function MissionCommandBar(props: {
 
   onCleanup(() => recognition?.abort())
 
+  createEffect(() => {
+    if (!props.focusRequest) return
+    promptInput?.focus()
+    promptInput?.scrollIntoView({ behavior: "smooth", block: "center" })
+  })
+
   return (
     <section class="mission-bar">
       <form
@@ -1095,37 +1115,44 @@ function MissionCommandBar(props: {
           event.preventDefault()
           if (!props.project || !prompt().trim()) return
           setBusy(true)
-          const payloadPrompt = productPrompt({ prompt: prompt(), style: style(), notes: notes() })
-          const generatedTitle = taskTitleFromPrompt(prompt())
-          const task =
-            mode() === "swarm"
-              ? await props.api.createOrchestration({
-                  projectId: props.project.id,
-                  title: generatedTitle,
-                  prompt: payloadPrompt,
-                  model: model(),
-                  collaboration: "project",
-                  scale: scale(),
-                  files: files(),
-                })
-              : await props.api.createTask({
-                  projectId: props.project.id,
-                  title: generatedTitle,
-                  prompt: payloadPrompt,
-                  agent: agent(),
-                  model: model(),
-                  collaboration: "project",
-                  files: files(),
-                })
-          setPrompt("")
-          setFiles([])
-          setBusy(false)
-          await props.onCreated(task.id)
+          setSubmitError("")
+          try {
+            const payloadPrompt = productPrompt({ prompt: prompt(), style: style(), notes: notes() })
+            const generatedTitle = taskTitleFromPrompt(prompt())
+            const task =
+              mode() === "swarm"
+                ? await props.api.createOrchestration({
+                    projectId: props.project.id,
+                    title: generatedTitle,
+                    prompt: payloadPrompt,
+                    model: model(),
+                    collaboration: "project",
+                    scale: scale(),
+                    files: files(),
+                  })
+                : await props.api.createTask({
+                    projectId: props.project.id,
+                    title: generatedTitle,
+                    prompt: payloadPrompt,
+                    agent: agent(),
+                    model: model(),
+                    collaboration: "project",
+                    files: files(),
+                  })
+            setPrompt("")
+            setFiles([])
+            await props.onCreated(task.id)
+          } catch (error) {
+            setSubmitError(error instanceof Error ? error.message : String(error))
+          } finally {
+            setBusy(false)
+          }
         }}
       >
         <div class="mission-input">
           <span>Mission</span>
           <textarea
+            ref={promptInput}
             value={prompt()}
             onInput={(event) => setPrompt(event.currentTarget.value)}
             placeholder="Describe the product or engineering outcome. FactorySight will name the task automatically..."
@@ -1147,6 +1174,9 @@ function MissionCommandBar(props: {
             </Show>
           </div>
         </div>
+        <Show when={submitError()}>
+          <div class="composer-error">{submitError()}</div>
+        </Show>
         <div class="mission-options">
           <div class="mission-selects">
             <select value={mode()} onChange={(event) => setMode(event.currentTarget.value as ComposeMode)}>

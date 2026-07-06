@@ -1,5 +1,12 @@
 import { expect, test } from "bun:test"
-import { artifactsForProject, defaultProjectPath, nextSelectedTaskId, slugProjectName } from "./view-model"
+import {
+  artifactsForProject,
+  defaultProjectPath,
+  nextSelectedTaskId,
+  preferredSpeechLanguage,
+  slugProjectName,
+  taskTitleFromPrompt,
+} from "./view-model"
 
 test("artifactsForProject only returns artifacts for the active project", () => {
   const artifacts = [
@@ -37,4 +44,19 @@ test("nextSelectedTaskId falls back to the newest task in the active project", (
   ]
 
   expect(nextSelectedTaskId(tasks, "project", undefined)).toBe("newest")
+})
+
+test("taskTitleFromPrompt creates a concise title from the mission", () => {
+  expect(taskTitleFromPrompt("请帮我开发一个可玩的贪吃蛇游戏，需要有计分。")).toBe(
+    "帮我开发一个可玩的贪吃蛇游戏，需要有计分。",
+  )
+  expect(taskTitleFromPrompt("Please build a dashboard. It should show revenue.")).toBe("build a dashboard.")
+  expect(taskTitleFromPrompt("  ")).toBe("Untitled mission")
+  expect(taskTitleFromPrompt("a".repeat(90))).toBe(`${"a".repeat(72)}...`)
+})
+
+test("preferredSpeechLanguage prioritizes Chinese when available", () => {
+  expect(preferredSpeechLanguage(["en-US", "zh-CN"])).toBe("zh-CN")
+  expect(preferredSpeechLanguage(["en-US"])).toBe("en-US")
+  expect(preferredSpeechLanguage([])).toBe("zh-CN")
 })

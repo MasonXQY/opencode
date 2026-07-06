@@ -23,6 +23,22 @@ export function defaultProjectPath(
   return `${basePath}/${slugProjectName(name)}-${suffix}`
 }
 
+export function taskTitleFromPrompt(value: string) {
+  const text = value
+    .replace(/\s+/g, " ")
+    .replace(/^[\s"'“”‘’`]+|[\s"'“”‘’`]+$/g, "")
+    .trim()
+  if (!text) return "Untitled mission"
+  const sentence = text.split(/(?<=[。！？.!?])\s+/)[0] ?? text
+  const cleaned = sentence.replace(/^(please|can you|could you|help me|帮我|请|麻烦你|你能否|能否)\s*/i, "").trim()
+  const title = cleaned || text
+  return title.length > 72 ? `${title.slice(0, 72).trim()}...` : title
+}
+
+export function preferredSpeechLanguage(languages: readonly string[] = []) {
+  return languages.find((language) => language.toLowerCase().startsWith("zh")) ?? languages[0] ?? "zh-CN"
+}
+
 type SelectableTask = {
   id: string
   projectId: string
