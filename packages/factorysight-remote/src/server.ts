@@ -22,7 +22,8 @@ import {
   visibleProjects,
   visibleTasks,
 } from "./store"
-import { enqueueTask } from "./runner"
+import { enqueueTask, enqueueTaskChain } from "./runner"
+import { childPrompt, orchestrationPlan } from "./orchestration"
 import { agentProfiles, defaultAgents, permissionProfiles, type Artifact, type Project, type Task, type User } from "./shared"
 import { availableModels } from "./models"
 import { listProjectFiles, saveUploadedFile } from "./file-storage"
@@ -192,113 +193,6 @@ async function attachFiles(project: Project, task: Task, files: File[], userId: 
       .join("\n")}`,
   })
   return { ...task, fileIds: saved.map((file) => file.id) }
-}
-
-function orchestrationPlan(prompt: string, scale: "focused" | "balanced" | "wide") {
-  const normalized = prompt.toLowerCase()
-  const agents = [
-    {
-      agent: "product-lead",
-      title: "Shape product intent and acceptance criteria",
-      brief: "Clarify user value, scope, edge cases, and acceptance criteria.",
-    },
-    {
-      agent: "tech-lead",
-      title: "Design implementation approach",
-      brief: "Choose architecture, sequencing, risks, and integration points.",
-    },
-  ]
-
-  if (scale !== "focused" && /(architecture|platform|scale|tenant|安全边界|架构|平台|多用户|权限)/i.test(normalized)) {
-    agents.push({
-      agent: "architect",
-      title: "Map system architecture",
-      brief: "Define boundaries, state flow, risks, and long-term architecture constraints.",
-    })
-  }
-
-  if (/(ui|frontend|web|mobile|page|screen|ux|界面|前端|手机|体验)/i.test(normalized)) {
-    agents.push({
-      agent: "ux-designer",
-      title: "Shape user workflow",
-      brief: "Design the interaction model, information hierarchy, and task flow.",
-    })
-    agents.push({
-      agent: "frontend-engineer",
-      title: "Implement user-facing experience",
-      brief: "Build the responsive UI, states, and interaction flow.",
-    })
-  }
-
-  if (/(api|backend|server|database|auth|runner|后端|接口|数据库)/i.test(normalized)) {
-    agents.push({
-      agent: "backend-engineer",
-      title: "Implement backend capability",
-      brief: "Build APIs, storage behavior, permissions, and runner integration.",
-    })
-  }
-
-  if (scale === "wide" || /(security|auth|permission|public|internet|公网|安全|登录|权限)/i.test(normalized)) {
-    agents.push({
-      agent: "security-reviewer",
-      title: "Review security and isolation",
-      brief: "Check exposure, permissions, credentials, and cross-user isolation.",
-    })
-  }
-
-  if (scale === "wide" || /(deploy|ops|server|tunnel|cloud|部署|运维|公网)/i.test(normalized)) {
-    agents.push({
-      agent: "devops-engineer",
-      title: "Check deployment and operations",
-      brief: "Validate service startup, health, exposure model, and operational risks.",
-    })
-  }
-
-  if (scale === "wide" || /(docs|readme|north star|文档|说明)/i.test(normalized)) {
-    agents.push({
-      agent: "technical-writer",
-      title: "Prepare handoff notes",
-      brief: "Document decisions, operating steps, and follow-up work.",
-    })
-  }
-
-  agents.push(
-    {
-      agent: "build",
-      title: "Execute implementation",
-      brief: "Make the code changes needed to deliver the target behavior.",
-    },
-    {
-      agent: "qa-engineer",
-      title: "Verify behavior",
-      brief: "Check build, type safety, core flows, and regression risk.",
-    },
-    {
-      agent: "code-reviewer",
-      title: "Review final changes",
-      brief: "Look for bugs, missing tests, security issues, and unclear behavior.",
-    },
-  )
-
-  const seen = new Set<string>()
-  const unique = agents.filter((item) => {
-    if (seen.has(item.agent)) return false
-    seen.add(item.agent)
-    return true
-  })
-  if (scale === "focused") return unique.slice(0, 4)
-  if (scale === "balanced") return unique.slice(0, 8)
-  return unique
-}
-
-function childPrompt(parent: Task, agent: string, brief: string) {
-  return [
-    `You are the ${agent} sub-agent in an autonomous FactorySight orchestration.`,
-    `Parent objective: ${parent.prompt}`,
-    `Your responsibility: ${brief}`,
-    "Work in your own bounded context. Do not assume other sub-agents saw your local reasoning.",
-    "Return only task-relevant findings, concrete changes, verification notes, and handoff context for the orchestrator.",
-  ].join("\n\n")
 }
 
 async function artifactFiles(project: Project): Promise<Artifact[]> {
@@ -523,17 +417,18 @@ app.post("/api/orchestrations", async (c) => {
   parent = await attachFiles(project, parent, files, user.id)
   await appendEvent(parent.id, {
     type: "system",
-    text: `Autonomous Agent Swarm started in ${body.scale} mode.`,
+    text: `Autonomous Agent Swarm queued in ${body.scale} mode. Main planning runs first, then specialist roles run in sequence.`,
   })
 
+  const steps = orchestrationPlan(body.prompt, body.scale)
   const children: Task[] = []
-  for (const step of orchestrationPlan(body.prompt, body.scale)) {
+  for (const step of steps) {
     const child = await createTask({
       creatorId: user.id,
       projectId: body.projectId,
       parentTaskId: parent.id,
       title: step.title,
-      prompt: childPrompt(parent, step.agent, step.brief),
+      prompt: childPrompt(parent, step),
       agent: step.agent,
       model: body.model,
       collaboration: body.collaboration,
@@ -542,17 +437,16 @@ app.post("/api/orchestrations", async (c) => {
     children.push(child)
     await appendEvent(parent.id, {
       type: "system",
-      text: `Dispatched ${step.agent}: ${step.title}`,
+      text: `Queued ${step.phase} phase role ${step.agent}: ${step.title}`,
     })
-    enqueueTask(child)
   }
 
   await patchTask(parent.id, { childTaskIds: children.map((child) => child.id) })
   await appendEvent(parent.id, {
     type: "system",
-    text: `Orchestrator created ${children.length} context shards and dispatched them in parallel.`,
+    text: `Orchestrator created ${children.length} ordered steps. Running the main plan step before dispatching specialist work.`,
   })
-  await setTaskStatus(parent.id, "completed", "Sub-agent tasks dispatched")
+  enqueueTaskChain(parent.id, children)
   return c.json({ ...parent, childTaskIds: children.map((child) => child.id) })
 })
 

@@ -1,7 +1,7 @@
 import { render } from "solid-js/web"
 import { For, Show, createEffect, createMemo, createResource, createSignal, onCleanup } from "solid-js"
 import { ApiClient } from "./api"
-import { artifactsForProject } from "./view-model"
+import { artifactsForProject, defaultProjectPath } from "./view-model"
 import type { Accessor } from "solid-js"
 import {
   preferredDefaultModel,
@@ -823,8 +823,10 @@ function PermissionSwitcher(props: {
 
 function ProjectForm(props: { data: BootstrapData; api: ApiClient; onCreated: (projectId: string) => void | Promise<void> }) {
   const [open, setOpen] = createSignal(props.data.projects.length === 0)
+  const projectSuffix = Math.random().toString(36).slice(2, 8)
   const [name, setName] = createSignal("FactorySight")
-  const [projectPath, setProjectPath] = createSignal("/Users/mason/Documents/Codex/2026-07-05/opencode/upstream-opencode")
+  const [projectPath, setProjectPath] = createSignal(defaultProjectPath("FactorySight", projectSuffix))
+  const [pathEdited, setPathEdited] = createSignal(false)
   const [busy, setBusy] = createSignal(false)
 
   return (
@@ -846,11 +848,24 @@ function ProjectForm(props: { data: BootstrapData; api: ApiClient; onCreated: (p
         >
           <label>
             Name
-            <input value={name()} onInput={(event) => setName(event.currentTarget.value)} />
+            <input
+              value={name()}
+              onInput={(event) => {
+                const next = event.currentTarget.value
+                setName(next)
+                if (!pathEdited()) setProjectPath(defaultProjectPath(next, projectSuffix))
+              }}
+            />
           </label>
           <label>
             Server path
-            <input value={projectPath()} onInput={(event) => setProjectPath(event.currentTarget.value)} />
+            <input
+              value={projectPath()}
+              onInput={(event) => {
+                setPathEdited(true)
+                setProjectPath(event.currentTarget.value)
+              }}
+            />
           </label>
           <button disabled={busy()}>{busy() ? "Creating..." : "Create project"}</button>
         </form>

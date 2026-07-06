@@ -3,6 +3,7 @@ import { spawn } from "node:child_process"
 import { appendEvent, getState, patchTask, setTaskStatus } from "./store"
 import type { Task } from "./shared"
 import { listProjectFiles } from "./file-storage"
+import { runnerAgentFor } from "./agent-routing"
 
 const running = new Set<string>()
 
@@ -104,9 +105,12 @@ async function appendOutput(taskId: string, type: "runner" | "error", chunk: Uin
 }
 
 async function readOutput(taskId: string, type: "runner" | "error", stream: AsyncIterable<Uint8Array>) {
+  let text = ""
   for await (const chunk of stream) {
+    text += decoder().decode(chunk)
     await appendOutput(taskId, type, chunk)
   }
+  return text
 }
 
 export async function runTask(taskId: string) {
@@ -128,8 +132,15 @@ export async function runTask(taskId: string) {
     }
 
     const bin = binaryPath()
+    const runnerAgent = runnerAgentFor(task.agent)
     await setTaskStatus(taskId, "running", `Runner started with ${task.agent} on ${task.model}`)
     await appendEvent(taskId, { type: "runner", text: `Workspace: ${project.path}` })
+    if (runnerAgent !== task.agent) {
+      await appendEvent(taskId, {
+        type: "system",
+        text: `Role ${task.agent} is running through primary agent ${runnerAgent}.`,
+      })
+    }
     const prompt = await attachedFileContext(task, project.path)
 
     const args = [
@@ -139,7 +150,7 @@ export async function runTask(taskId: string) {
         "--format",
         "json",
         "--agent",
-        task.agent,
+        runnerAgent,
         "--model",
         task.model,
         "--dir",
@@ -164,7 +175,7 @@ export async function runTask(taskId: string) {
     await patchTask(taskId, { runnerPid: proc.pid })
 
     const exitCodePromise = new Promise<number | null>((resolve) => proc.on("close", resolve))
-    await Promise.all([
+    const [stdoutText, stderrText] = await Promise.all([
       proc.stdout ? readOutput(taskId, "runner", proc.stdout) : Promise.resolve(),
       proc.stderr ? readOutput(taskId, "error", proc.stderr) : Promise.resolve(),
     ])
@@ -172,8 +183,12 @@ export async function runTask(taskId: string) {
     const exitCode = (await exitCodePromise) ?? 1
     await patchTask(taskId, { runnerPid: undefined })
     await appendDeliverable(task, project.path, exitCode)
-    if (exitCode === 0) {
+    const combinedOutput = `${stdoutText ?? ""}\n${stderrText ?? ""}`
+    const permissionAutoRejected = /permission requested:|auto-rejecting/i.test(combinedOutput)
+    if (exitCode === 0 && !permissionAutoRejected) {
       await setTaskStatus(taskId, "completed", "Task completed")
+    } else if (permissionAutoRejected) {
+      await setTaskStatus(taskId, "failed", "Permission request was auto-rejected")
     } else {
       await setTaskStatus(taskId, "failed", `Runner exited with code ${exitCode}`)
     }
@@ -191,4 +206,37 @@ export async function runTask(taskId: string) {
 
 export function enqueueTask(task: Task) {
   void runTask(task.id)
+}
+
+export function enqueueTaskChain(parentTaskId: string, tasks: Task[]) {
+  const taskIds = tasks.map((task) => task.id)
+  void runTaskChain(parentTaskId, taskIds)
+}
+
+async function runTaskChain(parentTaskId: string, taskIds: string[]) {
+  await setTaskStatus(parentTaskId, "running", "Main agent planning and dispatch started")
+  for (const taskId of taskIds) {
+    const state = await getState()
+    const task = state.tasks.find((item) => item.id === taskId)
+    if (!task) continue
+    await appendEvent(parentTaskId, {
+      type: "system",
+      text: `Starting ${task.agent}: ${task.title}`,
+    })
+    await runTask(task.id)
+    const updated = (await getState()).tasks.find((item) => item.id === task.id)
+    if (updated?.status === "failed") {
+      await appendEvent(parentTaskId, {
+        type: "error",
+        text: `${task.agent} failed. Stopping the remaining orchestration chain.`,
+      })
+      await setTaskStatus(parentTaskId, "failed", `Stopped after ${task.agent} failed`)
+      return
+    }
+    await appendEvent(parentTaskId, {
+      type: "system",
+      text: `Completed ${task.agent}: ${task.title}`,
+    })
+  }
+  await setTaskStatus(parentTaskId, "completed", "Orchestration chain completed")
 }
