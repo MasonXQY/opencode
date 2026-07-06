@@ -262,29 +262,31 @@ h3 {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 18px;
   font-weight: 900;
   color: var(--presight-color-blue-900);
 }
 
 .topbar .brand::before {
   content: "F";
-  width: 24px;
+  width: 22px;
   aspect-ratio: 1;
   display: inline-grid;
   place-items: center;
   border: 1px solid var(--presight-color-gray-900);
-  border-radius: 7px;
+  border-radius: 6px;
   background: var(--presight-color-gray-900);
   color: #ffffff;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1;
 }
 
 .muted {
   color: var(--presight-color-gray-500);
-  font-size: 14px;
-  line-height: 20px;
+  font-size: 13px;
+  line-height: 18px;
 }
 
 .error {
@@ -349,9 +351,9 @@ h3 {
   z-index: 10;
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: 18px;
   align-items: center;
-  padding: 12px 18px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--presight-color-gray-200);
   background: var(--factory-topbar);
   box-shadow: none;
@@ -362,31 +364,33 @@ h3 {
   flex: 1 1 auto;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 18px;
 }
 
 .topbar-primary > div:first-child {
-  min-width: 184px;
+  min-width: 178px;
 }
 
 .workspace-summary {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   color: var(--presight-color-gray-600);
 }
 
 .workspace-summary span {
-  min-width: 68px;
-  display: grid;
-  gap: 1px;
-  padding: 6px 9px;
-  border: 1px solid var(--presight-color-gray-200);
-  border-radius: var(--presight-radius-md);
-  background: #ffffff;
+  min-width: 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--presight-color-gray-50);
+  color: var(--presight-color-gray-500);
   font-size: 11px;
-  line-height: 14px;
+  line-height: 16px;
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -399,8 +403,8 @@ h3 {
 
 .workspace-summary strong {
   color: var(--presight-color-gray-900);
-  font-size: 16px;
-  line-height: 20px;
+  font-size: 13px;
+  line-height: 16px;
 }
 
 .workspace-summary small {
@@ -422,10 +426,12 @@ h3 {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
 }
 
 .topbar-actions > button {
+  min-height: 34px;
+  padding: 7px 10px;
   white-space: nowrap;
 }
 
@@ -438,27 +444,30 @@ h3 {
 }
 
 .design-button {
-  min-width: 128px;
-  min-height: 50px;
-  display: grid;
-  gap: 2px;
+  min-width: 0;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
   text-align: left;
   background: var(--factory-surface);
   color: var(--presight-color-gray-800);
-  border-color: var(--presight-color-gray-200);
+  border-color: transparent;
   box-shadow: none;
 }
 
 .design-button span {
   color: var(--presight-color-gray-500);
-  font-size: 12px;
-  line-height: 16px;
+  font-size: 11px;
+  line-height: 14px;
   font-weight: 800;
+  text-transform: uppercase;
 }
 
 .design-button strong {
-  font-size: 14px;
-  line-height: 20px;
+  font-size: 13px;
+  line-height: 18px;
 }
 
 .design-menu {
@@ -533,27 +542,30 @@ h3 {
 }
 
 .permission-button {
-  min-width: 176px;
-  min-height: 50px;
-  display: grid;
-  gap: 2px;
+  min-width: 0;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
   text-align: left;
-  background: var(--presight-color-gray-50);
+  background: #ffffff;
   color: var(--presight-color-gray-900);
   border-color: var(--presight-color-gray-200);
   box-shadow: none;
 }
 
 .permission-button span {
-  color: var(--presight-color-blue-600);
-  font-size: 12px;
-  line-height: 16px;
-  font-weight: 700;
+  color: var(--presight-color-gray-500);
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .permission-button strong {
-  font-size: 14px;
-  line-height: 20px;
+  font-size: 13px;
+  line-height: 18px;
 }
 
 .permission-menu {
