@@ -1,7 +1,7 @@
 import { render } from "solid-js/web"
 import { For, Show, createEffect, createMemo, createResource, createSignal, onCleanup } from "solid-js"
 import { ApiClient } from "./api"
-import { artifactsForProject, defaultProjectPath } from "./view-model"
+import { artifactsForProject, defaultProjectPath, nextSelectedTaskId } from "./view-model"
 import type { Accessor } from "solid-js"
 import {
   preferredDefaultModel,
@@ -339,8 +339,7 @@ function Workspace(props: {
   })
 
   createEffect(() => {
-    if (props.selectedTaskId && selectedTask()) return
-    props.onSelectTask(projectTasks()[0]?.id)
+    props.onSelectTask(nextSelectedTaskId(props.data.tasks, activeProjectId(), props.selectedTaskId))
   })
 
   return (
@@ -419,7 +418,10 @@ function Workspace(props: {
             data={props.data}
             api={props.api}
             activeProjectId={activeProject()?.id}
-            onCreated={props.onRefresh}
+            onCreated={async (taskId) => {
+              await props.onRefresh()
+              props.onSelectTask(taskId)
+            }}
           />
         </aside>
         <section class="detail">
@@ -929,7 +931,7 @@ function ProjectFilesPanel(props: {
   )
 }
 
-function TaskForm(props: { data: BootstrapData; api: ApiClient; activeProjectId: string | undefined; onCreated: () => void }) {
+function TaskForm(props: { data: BootstrapData; api: ApiClient; activeProjectId: string | undefined; onCreated: (taskId: string) => void | Promise<void> }) {
   const [mode, setMode] = createSignal<"single" | "team">("team")
   const [scale, setScale] = createSignal<"focused" | "balanced" | "wide">("balanced")
   const [projectId, setProjectId] = createSignal(props.activeProjectId ?? "")
@@ -973,33 +975,32 @@ function TaskForm(props: { data: BootstrapData; api: ApiClient; activeProjectId:
             style: productStyle(),
             styleNotes: styleNotes(),
           })
-          if (mode() === "team") {
-            await props.api.createOrchestration({
-              projectId: projectId(),
-              title: title() || prompt().slice(0, 80),
-              prompt: composedPrompt,
-              model: model(),
-              collaboration: collaboration(),
-              scale: scale(),
-              files: files(),
-            })
-          } else {
-            await props.api.createTask({
-              projectId: projectId(),
-              title: title() || prompt().slice(0, 80),
-              prompt: composedPrompt,
-              agent: agent(),
-              model: model(),
-              collaboration: collaboration(),
-              files: files(),
-            })
-          }
+          const task =
+            mode() === "team"
+              ? await props.api.createOrchestration({
+                  projectId: projectId(),
+                  title: title() || prompt().slice(0, 80),
+                  prompt: composedPrompt,
+                  model: model(),
+                  collaboration: collaboration(),
+                  scale: scale(),
+                  files: files(),
+                })
+              : await props.api.createTask({
+                  projectId: projectId(),
+                  title: title() || prompt().slice(0, 80),
+                  prompt: composedPrompt,
+                  agent: agent(),
+                  model: model(),
+                  collaboration: collaboration(),
+                  files: files(),
+                })
           setBusy(false)
           setTitle("")
           setPrompt("")
           setStyleNotes("")
           setFiles([])
-          props.onCreated()
+          await props.onCreated(task.id)
         }}
         >
         <div class="mode-cards">
