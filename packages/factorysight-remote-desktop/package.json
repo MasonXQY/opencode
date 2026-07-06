@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@opencode-ai/factorysight-remote-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "typecheck": "tsgo --noEmit",
+    "predev": "bun run --cwd ../factorysight-remote build",
+    "dev": "electron-vite dev",
+    "prebuild": "bun run --cwd ../factorysight-remote build",
+    "build": "electron-vite build",
+    "package:mac": "bun run build && electron-builder --mac --config electron-builder.config.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.14",
+    "hono": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "electron": "42.3.3",
+    "electron-builder": "26.15.2",
+    "electron-vite": "^5",
+    "typescript": "catalog:"
+  }
+}

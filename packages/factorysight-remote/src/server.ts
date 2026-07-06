@@ -2,7 +2,8 @@ import { Hono } from "hono"
 import { cors } from "hono/cors"
 import { z } from "zod"
 import path from "node:path"
-import { readdir } from "node:fs/promises"
+import { readFile, readdir } from "node:fs/promises"
+import { fileURLToPath } from "node:url"
 import {
   appendEvent,
   createProject,
@@ -25,8 +26,9 @@ import { enqueueTask } from "./runner"
 import { agentProfiles, defaultAgents, permissionProfiles, type Artifact, type Project, type Task, type User } from "./shared"
 import { availableModels } from "./models"
 
-const app = new Hono<{ Variables: { user: User } }>()
-const clientDir = path.resolve(import.meta.dir, "..", "dist", "client")
+export const app = new Hono<{ Variables: { user: User } }>()
+const sourceDir = typeof import.meta.dirname === "string" ? import.meta.dirname : path.dirname(new URL(import.meta.url).pathname)
+const clientDir = path.resolve(process.env.FACTORYSIGHT_REMOTE_CLIENT_DIR ?? path.resolve(sourceDir, "..", "dist", "client"))
 
 const loginSchema = z.object({ email: z.string().email() })
 const createProjectSchema = z.object({
@@ -274,8 +276,6 @@ app.get("/api/projects/:projectId/artifacts/*", async (c) => {
   const requested = path.resolve(artifactRoot, decodeURIComponent(rawPath))
   if (!requested.startsWith(artifactRoot)) return c.json({ error: "artifact path not allowed" }, 403)
 
-  const file = Bun.file(requested)
-  if (!(await file.exists())) return c.json({ error: "artifact not found" }, 404)
   const headers = new Headers({ "Content-Type": contentType(requested) })
   const token = c.req.query("token")
   if (token) {
@@ -284,7 +284,14 @@ app.get("/api/projects/:projectId/artifacts/*", async (c) => {
       `factorysight_artifact_token=${encodeURIComponent(token)}; Path=/api/projects/${project.id}/artifacts; SameSite=Lax`,
     )
   }
-  return new Response(file, { headers })
+  try {
+    return new Response(await readFile(requested), { headers })
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      return c.json({ error: "artifact not found" }, 404)
+    }
+    throw error
+  }
 })
 
 app.get("/api/projects", async (c) => {
@@ -498,9 +505,12 @@ app.get("/api/tasks/:taskId/events", async (c) => {
 async function staticResponse(filePath: string) {
   const resolved = path.resolve(filePath)
   if (!resolved.startsWith(clientDir)) return
-  const file = Bun.file(filePath)
-  if (!(await file.exists())) return
-  return new Response(file, { headers: { "Content-Type": contentType(resolved) } })
+  try {
+    return new Response(await readFile(filePath), { headers: { "Content-Type": contentType(resolved) } })
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return
+    throw error
+  }
 }
 
 function contentType(filePath: string) {
@@ -523,10 +533,13 @@ app.get("*", async (c) => {
 const port = Number(process.env.PORT ?? process.env.FACTORYSIGHT_REMOTE_PORT ?? 3090)
 const hostname = process.env.HOST ?? process.env.FACTORYSIGHT_REMOTE_HOST ?? "0.0.0.0"
 
-Bun.serve({
-  hostname,
-  port,
-  fetch: app.fetch,
-})
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const { serve } = await import("@hono/node-server")
+  serve({
+    hostname,
+    port,
+    fetch: app.fetch,
+  })
 
-console.log(`FactorySight Remote listening on http://${hostname}:${port}`)
+  console.log(`FactorySight Remote listening on http://${hostname}:${port}`)
+}

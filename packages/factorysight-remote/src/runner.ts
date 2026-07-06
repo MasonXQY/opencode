@@ -1,4 +1,5 @@
 import path from "node:path"
+import { spawn } from "node:child_process"
 import { appendEvent, getState, patchTask, setTaskStatus } from "./store"
 import type { Task } from "./shared"
 
@@ -15,15 +16,19 @@ function decoder() {
   return new TextDecoder()
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 async function runMockTask(task: Task, projectPath: string) {
   await setTaskStatus(task.id, "running", `Demo runner started with ${task.agent} on ${task.model}`)
   await appendEvent(task.id, { type: "runner", text: `Workspace: ${projectPath}` })
   await appendEvent(task.id, { type: "runner", text: "Planning the task and checking project context." })
-  await Bun.sleep(350)
+  await sleep(350)
   await appendEvent(task.id, { type: "runner", text: "Assigning work to the selected agent role." })
-  await Bun.sleep(350)
+  await sleep(350)
   await appendEvent(task.id, { type: "runner", text: "Drafting implementation notes and collaboration handoff." })
-  await Bun.sleep(350)
+  await sleep(350)
   await appendEvent(task.id, {
     type: "deliverable",
     text: "Demo deliverable\n\n- Summary: task completed successfully in demo mode.\n- Files changed: demo mode does not modify files.\n- Verification: runner lifecycle completed.",
@@ -31,30 +36,26 @@ async function runMockTask(task: Task, projectPath: string) {
   await setTaskStatus(task.id, "completed", "Demo task completed")
 }
 
-async function readText(stream: ReadableStream<Uint8Array>) {
-  const reader = stream.getReader()
-  const decoder = new TextDecoder()
+async function readText(stream: AsyncIterable<Uint8Array>) {
   let text = ""
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) return text
-      text += decoder.decode(value, { stream: true })
-    }
-  } finally {
-    reader.releaseLock()
+  for await (const chunk of stream) {
+    text += decoder().decode(chunk, { stream: true })
   }
+  return text
 }
 
 async function gitStatus(projectPath: string) {
   try {
-    const proc = Bun.spawn(["git", "status", "--short"], {
+    const proc = spawn("git", ["status", "--short"], {
       cwd: projectPath,
-      stdout: "pipe",
-      stderr: "pipe",
+      stdio: ["ignore", "pipe", "pipe"],
     })
-    const [stdout] = await Promise.all([readText(proc.stdout), readText(proc.stderr)])
-    if ((await proc.exited) !== 0) return "Git status unavailable."
+    const [stdout, exitCode] = await Promise.all([
+      proc.stdout ? readText(proc.stdout) : Promise.resolve(""),
+      new Promise<number | null>((resolve) => proc.on("close", resolve)),
+      proc.stderr ? readText(proc.stderr) : Promise.resolve(""),
+    ])
+    if (exitCode !== 0) return "Git status unavailable."
     const files = stdout
       .split(/\r?\n/)
       .map((line) => line.trim())
@@ -92,16 +93,9 @@ async function appendOutput(taskId: string, type: "runner" | "error", chunk: Uin
   }
 }
 
-async function readOutput(taskId: string, type: "runner" | "error", stream: ReadableStream<Uint8Array>) {
-  const reader = stream.getReader()
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) return
-      await appendOutput(taskId, type, value)
-    }
-  } finally {
-    reader.releaseLock()
+async function readOutput(taskId: string, type: "runner" | "error", stream: AsyncIterable<Uint8Array>) {
+  for await (const chunk of stream) {
+    await appendOutput(taskId, type, chunk)
   }
 }
 
@@ -146,23 +140,25 @@ export async function runTask(taskId: string) {
       text: `Permission level: ${project.permissionLevel ?? "ask"}`,
     })
 
-    const proc = Bun.spawn(
-      args,
-      {
-        cwd: project.path,
-        stdout: "pipe",
-        stderr: "pipe",
-        env: {
-          ...process.env,
-          OPENCODE_DISABLE_AUTOUPDATE: "1",
-        },
+    const [command, ...commandArgs] = args
+    if (!command) throw new Error("Runner command is empty")
+    const proc = spawn(command, commandArgs, {
+      cwd: project.path,
+      stdio: ["ignore", "pipe", "pipe"],
+      env: {
+        ...process.env,
+        OPENCODE_DISABLE_AUTOUPDATE: "1",
       },
-    )
+    })
     await patchTask(taskId, { runnerPid: proc.pid })
 
-    await Promise.all([readOutput(taskId, "runner", proc.stdout), readOutput(taskId, "error", proc.stderr)])
+    const exitCodePromise = new Promise<number | null>((resolve) => proc.on("close", resolve))
+    await Promise.all([
+      proc.stdout ? readOutput(taskId, "runner", proc.stdout) : Promise.resolve(),
+      proc.stderr ? readOutput(taskId, "error", proc.stderr) : Promise.resolve(),
+    ])
 
-    const exitCode = await proc.exited
+    const exitCode = (await exitCodePromise) ?? 1
     await patchTask(taskId, { runnerPid: undefined })
     await appendDeliverable(task, project.path, exitCode)
     if (exitCode === 0) {

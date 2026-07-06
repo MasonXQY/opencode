@@ -1,6 +1,6 @@
 import path from "node:path"
 import { randomUUID } from "node:crypto"
-import { mkdir } from "node:fs/promises"
+import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { defaultPermissionLevel, type AppState, type PermissionLevel, type Project, type Role, type Task, type TaskEvent, type TaskStatus, type User } from "./shared"
 
 const defaultDataDir = path.join(process.env.HOME ?? process.cwd(), ".factorysight-remote")
@@ -27,12 +27,13 @@ function id(prefix: string) {
 async function ensureLoaded() {
   if (state) return state
   await mkdir(dataDir, { recursive: true })
-  await Bun.write(path.join(dataDir, ".keep"), "")
-  const file = Bun.file(statePath)
-  if (await file.exists()) {
-    state = (await file.json()) as AppState
+  await writeFile(path.join(dataDir, ".keep"), "")
+  try {
+    state = JSON.parse(await readFile(statePath, "utf8")) as AppState
     for (const project of state.projects) project.permissionLevel ??= defaultPermissionLevel
     return state
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error
   }
   state = {
     users: demoUsers,
@@ -46,7 +47,7 @@ async function ensureLoaded() {
 
 async function save() {
   if (!state) return
-  await Bun.write(statePath, JSON.stringify(state, null, 2))
+  await writeFile(statePath, JSON.stringify(state, null, 2))
 }
 
 export async function getState() {

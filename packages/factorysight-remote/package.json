@@ -11,6 +11,7 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
+    "@hono/node-server": "^1.19.14",
     "hono": "catalog:",
     "solid-js": "catalog:",
     "vite": "catalog:",

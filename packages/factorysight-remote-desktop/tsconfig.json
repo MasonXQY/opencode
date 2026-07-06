@@ -1,0 +1,10 @@
+{
+  "extends": "@tsconfig/bun/tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": true,
+    "types": ["bun", "node", "electron"],
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*.ts", "../factorysight-remote/src/**/*.ts", "electron.vite.config.ts", "electron-builder.config.ts"]
+}

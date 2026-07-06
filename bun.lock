@@ -492,6 +492,7 @@
       "name": "@opencode-ai/factorysight-remote",
       "version": "0.1.0",
       "dependencies": {
+        "@hono/node-server": "^1.19.14",
         "hono": "catalog:",
         "solid-js": "catalog:",
         "vite": "catalog:",
@@ -502,6 +503,24 @@
         "@tsconfig/bun": "catalog:",
         "@types/bun": "catalog:",
         "@typescript/native-preview": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
+    "packages/factorysight-remote-desktop": {
+      "name": "@opencode-ai/factorysight-remote-desktop",
+      "version": "0.1.0",
+      "dependencies": {
+        "@hono/node-server": "^1.19.14",
+        "hono": "catalog:",
+        "zod": "catalog:",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "@types/node": "catalog:",
+        "@typescript/native-preview": "catalog:",
+        "electron": "42.3.3",
+        "electron-builder": "26.15.2",
+        "electron-vite": "^5",
         "typescript": "catalog:",
       },
     },
@@ -1981,6 +2000,8 @@
     "@opencode-ai/enterprise": ["@opencode-ai/enterprise@workspace:packages/enterprise"],
 
     "@opencode-ai/factorysight-remote": ["@opencode-ai/factorysight-remote@workspace:packages/factorysight-remote"],
+
+    "@opencode-ai/factorysight-remote-desktop": ["@opencode-ai/factorysight-remote-desktop@workspace:packages/factorysight-remote-desktop"],
 
     "@opencode-ai/function": ["@opencode-ai/function@workspace:packages/function"],
 

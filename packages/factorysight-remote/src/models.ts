@@ -1,4 +1,5 @@
 import path from "node:path"
+import { spawn } from "node:child_process"
 import { defaultModels, preferredDefaultModel } from "./shared"
 
 let cached: { at: number; models: string[] } | undefined
@@ -10,35 +11,31 @@ function binaryPath() {
   )
 }
 
-async function readStream(stream: ReadableStream<Uint8Array>) {
-  const reader = stream.getReader()
+async function readStream(stream: AsyncIterable<Uint8Array>) {
   const decoder = new TextDecoder()
   let text = ""
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) return text
-      text += decoder.decode(value, { stream: true })
-    }
-  } finally {
-    reader.releaseLock()
+  for await (const chunk of stream) {
+    text += decoder.decode(chunk, { stream: true })
   }
+  return text
 }
 
 export async function availableModels(force = false) {
   if (!force && cached && Date.now() - cached.at < 60_000) return cached.models
 
   try {
-    const proc = Bun.spawn([binaryPath(), "models"], {
-      stdout: "pipe",
-      stderr: "pipe",
+    const proc = spawn(binaryPath(), ["models"], {
+      stdio: ["ignore", "pipe", "pipe"],
       env: {
         ...process.env,
         OPENCODE_DISABLE_AUTOUPDATE: "1",
       },
     })
-    const [stdout] = await Promise.all([readStream(proc.stdout), readStream(proc.stderr)])
-    const exitCode = await proc.exited
+    const [stdout, exitCode] = await Promise.all([
+      proc.stdout ? readStream(proc.stdout) : Promise.resolve(""),
+      new Promise<number | null>((resolve) => proc.on("close", resolve)),
+      proc.stderr ? readStream(proc.stderr) : Promise.resolve(""),
+    ])
     if (exitCode !== 0) return cached?.models ?? defaultModels
 
     const models = stdout
