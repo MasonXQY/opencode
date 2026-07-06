@@ -1,6 +1,7 @@
 import { render } from "solid-js/web"
 import { For, Show, createEffect, createMemo, createResource, createSignal, onCleanup } from "solid-js"
 import { ApiClient } from "./api"
+import { artifactsForProject } from "./view-model"
 import type { Accessor } from "solid-js"
 import {
   preferredDefaultModel,
@@ -428,6 +429,7 @@ function Workspace(props: {
                 task={task()}
                 data={props.data}
                 api={props.api}
+                activeProjectId={activeProject()?.id}
                 onRefresh={props.onRefresh}
                 onTaskChanged={props.onSelectTask}
               />
@@ -1179,6 +1181,7 @@ function TaskDetail(props: {
   task: Task
   data: BootstrapData
   api: ApiClient
+  activeProjectId: string | undefined
   onRefresh: () => void
   onTaskChanged: (id: string) => void
 }) {
@@ -1250,6 +1253,7 @@ function TaskDetail(props: {
             data={props.data}
             api={props.api}
             task={props.task}
+            activeProjectId={props.activeProjectId}
             events={events()}
             childTasks={childTasks()}
             onSelectTask={props.onTaskChanged}
@@ -1389,6 +1393,7 @@ function ResultPanel(props: {
   data: BootstrapData
   api: ApiClient
   task: Task
+  activeProjectId: string | undefined
   events: TaskEvent[]
   childTasks: Task[]
   onSelectTask: (id: string) => void
@@ -1398,9 +1403,7 @@ function ResultPanel(props: {
   const failedChildren = createMemo(() => props.childTasks.filter((task) => task.status === "failed"))
   const runnerPreview = createMemo(() => digest().runner.slice(-4))
   const isDone = createMemo(() => ["completed", "failed", "archived"].includes(props.task.status))
-  const projectArtifacts = createMemo(() =>
-    props.data.artifacts.filter((artifact) => artifact.projectId === props.task.projectId),
-  )
+  const projectArtifacts = createMemo(() => artifactsForProject(props.data.artifacts, props.activeProjectId))
   const taskFiles = createMemo(() => props.data.files.filter((file) => file.taskId === props.task.id))
 
   return (
