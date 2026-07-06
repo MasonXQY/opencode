@@ -1031,9 +1031,9 @@ label {
 .mission-input {
   min-width: 0;
   display: grid;
-  grid-template-columns: auto minmax(180px, 260px) minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 8px;
-  align-items: center;
+  align-items: start;
 }
 
 .mission-input span {
@@ -1047,8 +1047,31 @@ label {
 }
 
 .mission-input textarea {
-  min-height: 40px;
+  min-height: 48px;
   max-height: 92px;
+}
+
+.voice-tools {
+  min-width: 104px;
+  display: grid;
+  gap: 4px;
+}
+
+.voice-button {
+  min-width: 104px;
+}
+
+.voice-button.active {
+  border-color: rgb(79 109 245 / 0.42);
+  background: rgb(79 109 245 / 0.12);
+  color: #243fbf;
+}
+
+.voice-tools small {
+  max-width: 150px;
+  color: #a73143;
+  font-size: 11px;
+  line-height: 14px;
 }
 
 .mission-options {

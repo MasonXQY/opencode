@@ -21,6 +21,22 @@ const tokenKey = "factorysight.remote.token"
 type LibraryTab = "agents" | "projects" | "files" | "artifacts"
 type ComposeMode = "swarm" | "direct"
 type Scale = "focused" | "balanced" | "wide"
+type SpeechRecognitionResultLike = {
+  isFinal: boolean
+  0: { transcript: string }
+}
+type SpeechRecognitionLike = {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  onresult: ((event: { resultIndex: number; results: ArrayLike<SpeechRecognitionResultLike> }) => void) | null
+  onerror: ((event: { error?: string }) => void) | null
+  onend: (() => void) | null
+  start: () => void
+  stop: () => void
+  abort: () => void
+}
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike
 
 const productStyles = [
   {
@@ -73,6 +89,18 @@ function formatBytes(size: number) {
   if (size < 1024) return `${size} B`
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
   return `${(size / 1024 / 1024).toFixed(1)} MB`
+}
+
+function taskTitleFromPrompt(value: string) {
+  const text = value
+    .replace(/\s+/g, " ")
+    .replace(/^[\s"'“”‘’`]+|[\s"'“”‘’`]+$/g, "")
+    .trim()
+  if (!text) return "Untitled mission"
+  const sentence = text.split(/(?<=[。！？.!?])\s+/)[0] ?? text
+  const cleaned = sentence.replace(/^(please|can you|could you|help me|帮我|请|麻烦你|你能否|能否)\s*/i, "").trim()
+  const title = cleaned || text
+  return title.length > 72 ? `${title.slice(0, 72).trim()}...` : title
 }
 
 function taskCounts(tasks: Task[]) {
@@ -993,7 +1021,6 @@ function MissionCommandBar(props: {
 }) {
   const [mode, setMode] = createSignal<ComposeMode>("swarm")
   const [scale, setScale] = createSignal<Scale>("balanced")
-  const [title, setTitle] = createSignal("")
   const [prompt, setPrompt] = createSignal("")
   const [agent, setAgent] = createSignal("build")
   const [model, setModel] = createSignal(
@@ -1005,6 +1032,61 @@ function MissionCommandBar(props: {
   const [notes, setNotes] = createSignal("")
   const [files, setFiles] = createSignal<File[]>([])
   const [busy, setBusy] = createSignal(false)
+  const [listening, setListening] = createSignal(false)
+  const [voiceError, setVoiceError] = createSignal("")
+  let recognition: SpeechRecognitionLike | undefined
+  const speechCtor = () => {
+    const speechWindow = window as Window &
+      typeof globalThis & {
+        SpeechRecognition?: SpeechRecognitionConstructor
+        webkitSpeechRecognition?: SpeechRecognitionConstructor
+      }
+    return speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition
+  }
+  const speechSupported = () => typeof window !== "undefined" && Boolean(speechCtor())
+  const appendTranscript = (text: string) => {
+    const next = text.trim()
+    if (!next) return
+    setPrompt((current) => (current.trim() ? `${current.trim()} ${next}` : next))
+  }
+  const toggleVoiceInput = () => {
+    setVoiceError("")
+    if (listening()) {
+      recognition?.stop()
+      setListening(false)
+      return
+    }
+    const Recognition = speechCtor()
+    if (!Recognition) {
+      setVoiceError("Voice input is not supported in this browser.")
+      return
+    }
+    recognition?.abort()
+    recognition = new Recognition()
+    recognition.continuous = true
+    recognition.interimResults = false
+    recognition.lang = navigator.language || "en-US"
+    recognition.onresult = (event) => {
+      for (let index = event.resultIndex; index < event.results.length; index++) {
+        const result = event.results[index]
+        if (result?.isFinal) appendTranscript(result[0]?.transcript ?? "")
+      }
+    }
+    recognition.onerror = (event) => {
+      setVoiceError(event.error ? `Voice input stopped: ${event.error}` : "Voice input stopped.")
+      setListening(false)
+    }
+    recognition.onend = () => setListening(false)
+    try {
+      recognition.start()
+      setListening(true)
+    } catch {
+      setVoiceError("Voice input could not start.")
+      setListening(false)
+    }
+  }
+
+  onCleanup(() => recognition?.abort())
 
   return (
     <section class="mission-bar">
@@ -1014,11 +1096,12 @@ function MissionCommandBar(props: {
           if (!props.project || !prompt().trim()) return
           setBusy(true)
           const payloadPrompt = productPrompt({ prompt: prompt(), style: style(), notes: notes() })
+          const generatedTitle = taskTitleFromPrompt(prompt())
           const task =
             mode() === "swarm"
               ? await props.api.createOrchestration({
                   projectId: props.project.id,
-                  title: title() || prompt().slice(0, 80),
+                  title: generatedTitle,
                   prompt: payloadPrompt,
                   model: model(),
                   collaboration: "project",
@@ -1027,14 +1110,13 @@ function MissionCommandBar(props: {
                 })
               : await props.api.createTask({
                   projectId: props.project.id,
-                  title: title() || prompt().slice(0, 80),
+                  title: generatedTitle,
                   prompt: payloadPrompt,
                   agent: agent(),
                   model: model(),
                   collaboration: "project",
                   files: files(),
                 })
-          setTitle("")
           setPrompt("")
           setFiles([])
           setBusy(false)
@@ -1043,12 +1125,27 @@ function MissionCommandBar(props: {
       >
         <div class="mission-input">
           <span>Mission</span>
-          <input value={title()} onInput={(event) => setTitle(event.currentTarget.value)} placeholder="Task title" />
           <textarea
             value={prompt()}
             onInput={(event) => setPrompt(event.currentTarget.value)}
-            placeholder="Describe the product or engineering outcome..."
+            placeholder="Describe the product or engineering outcome. FactorySight will name the task automatically..."
           />
+          <div class="voice-tools">
+            <button
+              type="button"
+              class="secondary voice-button"
+              classList={{ active: listening() }}
+              disabled={!speechSupported()}
+              aria-pressed={listening()}
+              title={speechSupported() ? "Use voice input" : "Voice input is not supported in this browser"}
+              onClick={toggleVoiceInput}
+            >
+              {listening() ? "Listening" : "Voice"}
+            </button>
+            <Show when={voiceError()}>
+              <small>{voiceError()}</small>
+            </Show>
+          </div>
         </div>
         <div class="mission-options">
           <div class="mission-selects">
