@@ -471,6 +471,7 @@ function CanvasWorkspace(props: {
   const [libraryTab, setLibraryTab] = createSignal<LibraryTab>("projects")
   const [workspaceView, setWorkspaceView] = createSignal<WorkspaceView>("workflow")
   const [composerFocusRequest, setComposerFocusRequest] = createSignal(0)
+  const [composerCollapsed, setComposerCollapsed] = createSignal(false)
   const [workspaceDrawerOpen, setWorkspaceDrawerOpen] = createSignal(false)
   const [detailsDrawerOpen, setDetailsDrawerOpen] = createSignal(false)
   const activeProject = createMemo(() => props.data.projects.find((project) => project.id === activeProjectId()))
@@ -560,7 +561,10 @@ function CanvasWorkspace(props: {
               files={activeFiles()}
               onSelectTask={props.onSelectTask}
               onRefresh={props.onRefresh}
-              onStartWorkflow={() => setComposerFocusRequest((value) => value + 1)}
+              onStartWorkflow={() => {
+                setComposerCollapsed(false)
+                setComposerFocusRequest((value) => value + 1)
+              }}
             />
           }
         >
@@ -573,7 +577,10 @@ function CanvasWorkspace(props: {
             counts={counts()}
             onSelectTask={props.onSelectTask}
             onRefresh={props.onRefresh}
-            onStartWorkflow={() => setComposerFocusRequest((value) => value + 1)}
+            onStartWorkflow={() => {
+              setComposerCollapsed(false)
+              setComposerFocusRequest((value) => value + 1)
+            }}
           />
         </Show>
         <Show when={detailsDrawerOpen()}>
@@ -595,6 +602,8 @@ function CanvasWorkspace(props: {
         api={props.api}
         project={activeProject()}
         focusRequest={composerFocusRequest()}
+        collapsed={composerCollapsed()}
+        onCollapsedChange={setComposerCollapsed}
         onCreated={async (taskId) => {
           await props.onRefresh()
           props.onSelectTask(taskId)
@@ -1005,6 +1014,14 @@ function WorkflowCanvas(props: {
   return (
     <section class="workflow-canvas">
       <div class="canvas-grid" aria-hidden="true" />
+      <div class="canvas-toolstrip">
+        <button type="button" class="secondary" onClick={props.onRefresh}>
+          Agent prompts
+        </button>
+        <button type="button" class="secondary" onClick={props.onStartWorkflow}>
+          New node
+        </button>
+      </div>
       <div class="workflow-header">
         <div>
           <span class="eyebrow">Project workflow</span>
@@ -1525,6 +1542,8 @@ function MissionCommandBar(props: {
   api: ApiClient
   project: Project | undefined
   focusRequest: number
+  collapsed: boolean
+  onCollapsedChange: (collapsed: boolean) => void
   onCreated: (taskId: string) => void | Promise<void>
 }) {
   let promptInput: HTMLTextAreaElement | undefined
@@ -1614,150 +1633,178 @@ function MissionCommandBar(props: {
 
   createEffect(() => {
     if (!props.focusRequest) return
+    props.onCollapsedChange(false)
     promptInput?.focus()
     promptInput?.scrollIntoView({ behavior: "smooth", block: "center" })
   })
 
   return (
-    <section class="mission-bar">
-      <form
-        onSubmit={async (event) => {
-          event.preventDefault()
-          if (!props.project || !prompt().trim()) return
-          setBusy(true)
-          setSubmitError("")
-          try {
-            const payloadPrompt = productPrompt({ prompt: prompt(), style: style(), notes: notes() })
-            const generatedTitle = taskTitleFromPrompt(prompt())
-            const task =
-              mode() === "swarm"
-                ? await props.api.createOrchestration({
-                    projectId: props.project.id,
-                    title: generatedTitle,
-                    prompt: payloadPrompt,
-                    model: model(),
-                    collaboration: "project",
-                    scale: scale(),
-                    files: files(),
-                  })
-                : await props.api.createTask({
-                    projectId: props.project.id,
-                    title: generatedTitle,
-                    prompt: payloadPrompt,
-                    agent: agent(),
-                    model: model(),
-                    collaboration: "project",
-                    files: files(),
-                  })
-            setPrompt("")
-            setFiles([])
-            await props.onCreated(task.id)
-          } catch (error) {
-            setSubmitError(error instanceof Error ? error.message : String(error))
-          } finally {
-            setBusy(false)
-          }
-        }}
-      >
-        <div class="mission-input">
-          <span>Requirement</span>
-          <textarea
-            ref={promptInput}
-            value={prompt()}
-            onInput={(event) => setPrompt(event.currentTarget.value)}
-            placeholder="Describe what this project needs next. FactorySight will plan and run the workflow automatically..."
-          />
-          <div class="voice-tools">
+    <section class="mission-bar" classList={{ collapsed: props.collapsed }}>
+      <Show when={props.collapsed}>
+        <button
+          type="button"
+          class="composer-fab"
+          aria-label="Open requirement input"
+          onClick={() => {
+            props.onCollapsedChange(false)
+            requestAnimationFrame(() => promptInput?.focus())
+          }}
+        >
+          +
+        </button>
+      </Show>
+      <Show when={!props.collapsed}>
+        <form
+          onSubmit={async (event) => {
+            event.preventDefault()
+            if (!props.project || !prompt().trim()) return
+            setBusy(true)
+            setSubmitError("")
+            try {
+              const payloadPrompt = productPrompt({ prompt: prompt(), style: style(), notes: notes() })
+              const generatedTitle = taskTitleFromPrompt(prompt())
+              const task =
+                mode() === "swarm"
+                  ? await props.api.createOrchestration({
+                      projectId: props.project.id,
+                      title: generatedTitle,
+                      prompt: payloadPrompt,
+                      model: model(),
+                      collaboration: "project",
+                      scale: scale(),
+                      files: files(),
+                    })
+                  : await props.api.createTask({
+                      projectId: props.project.id,
+                      title: generatedTitle,
+                      prompt: payloadPrompt,
+                      agent: agent(),
+                      model: model(),
+                      collaboration: "project",
+                      files: files(),
+                    })
+              setPrompt("")
+              setFiles([])
+              await props.onCreated(task.id)
+            } catch (error) {
+              setSubmitError(error instanceof Error ? error.message : String(error))
+            } finally {
+              setBusy(false)
+            }
+          }}
+        >
+          <div class="mission-input">
+            <span>Requirement</span>
             <button
               type="button"
-              class="secondary voice-button"
-              classList={{ active: listening() }}
-              disabled={!speechSupported()}
-              aria-pressed={listening()}
-              title={speechSupported() ? "Use voice input" : "Voice input is not supported in this browser"}
-              onClick={toggleVoiceInput}
+              class="composer-minimize"
+              aria-label="Collapse requirement input"
+              onClick={() => props.onCollapsedChange(true)}
             >
-              {listening() ? "Listening" : "Voice"}
+              -
             </button>
-            <Show when={voiceError()}>
-              <small>{voiceError()}</small>
-            </Show>
+            <textarea
+              ref={promptInput}
+              value={prompt()}
+              onInput={(event) => setPrompt(event.currentTarget.value)}
+              placeholder="Describe what this project needs next. FactorySight will plan and run the workflow automatically..."
+            />
+            <div class="voice-tools">
+              <button
+                type="button"
+                class="secondary voice-button"
+                classList={{ active: listening() }}
+                disabled={!speechSupported()}
+                aria-pressed={listening()}
+                title={speechSupported() ? "Use voice input" : "Voice input is not supported in this browser"}
+                onClick={toggleVoiceInput}
+              >
+                {listening() ? "Listening" : "Voice"}
+              </button>
+              <Show when={voiceError()}>
+                <small>{voiceError()}</small>
+              </Show>
+            </div>
+            <div class="mission-inline-actions">
+              <button
+                type="button"
+                class="secondary"
+                classList={{ active: configOpen() }}
+                onClick={() => setConfigOpen((value) => !value)}
+              >
+                Config
+              </button>
+              <button disabled={!props.project || !prompt().trim() || busy()}>
+                {busy() ? "Launching..." : "Launch"}
+              </button>
+            </div>
           </div>
-          <div class="mission-inline-actions">
-            <button
-              type="button"
-              class="secondary"
-              classList={{ active: configOpen() }}
-              onClick={() => setConfigOpen((value) => !value)}
-            >
-              Config
-            </button>
-            <button disabled={!props.project || !prompt().trim() || busy()}>
-              {busy() ? "Launching..." : "Launch"}
-            </button>
-          </div>
-        </div>
-        <Show when={submitError()}>
-          <div class="composer-error">{submitError()}</div>
-        </Show>
-        <Show when={configOpen()}>
-          <div class="mission-config">
-            <label>
-              Mode
-              <select value={mode()} onChange={(event) => setMode(event.currentTarget.value as ComposeMode)}>
-                <option value="swarm">Agent swarm</option>
-                <option value="direct">Direct agent</option>
-              </select>
-            </label>
-            <Show
-              when={mode() === "swarm"}
-              fallback={
-                <label>
-                  Agent
-                  <select value={agent()} onChange={(event) => setAgent(event.currentTarget.value)}>
-                    <For each={props.data.agents}>
-                      {(item) => <option value={item}>{props.data.agentProfiles[item]?.name ?? item}</option>}
-                    </For>
-                  </select>
-                </label>
-              }
-            >
+          <Show when={submitError()}>
+            <div class="composer-error">{submitError()}</div>
+          </Show>
+          <Show when={configOpen()}>
+            <div class="mission-config">
               <label>
-                Scale
-                <select value={scale()} onChange={(event) => setScale(event.currentTarget.value as Scale)}>
-                  <option value="focused">Focused</option>
-                  <option value="balanced">Balanced</option>
-                  <option value="wide">Wide</option>
+                Mode
+                <select value={mode()} onChange={(event) => setMode(event.currentTarget.value as ComposeMode)}>
+                  <option value="swarm">Agent swarm</option>
+                  <option value="direct">Direct agent</option>
                 </select>
               </label>
-            </Show>
-            <label>
-              Model
-              <select value={model()} onChange={(event) => setModel(event.currentTarget.value)}>
-                <For each={props.data.models}>{(item) => <option value={item}>{item}</option>}</For>
-              </select>
-            </label>
-            <label>
-              Style
-              <select value={style()} onChange={(event) => setStyle(event.currentTarget.value as ProductStyleId)}>
-                <For each={productStyles}>{(item) => <option value={item.id}>{item.name}</option>}</For>
-              </select>
-            </label>
-            <label>
-              Style notes
-              <input
-                value={notes()}
-                onInput={(event) => setNotes(event.currentTarget.value)}
-                placeholder="Optional style notes"
-              />
-            </label>
-            <label class="attach-control">
-              {files().length ? `${files().length} files` : "Attach"}
-              <input type="file" multiple onChange={(event) => setFiles(Array.from(event.currentTarget.files ?? []))} />
-            </label>
-          </div>
-        </Show>
-      </form>
+              <Show
+                when={mode() === "swarm"}
+                fallback={
+                  <label>
+                    Agent
+                    <select value={agent()} onChange={(event) => setAgent(event.currentTarget.value)}>
+                      <For each={props.data.agents}>
+                        {(item) => <option value={item}>{props.data.agentProfiles[item]?.name ?? item}</option>}
+                      </For>
+                    </select>
+                  </label>
+                }
+              >
+                <label>
+                  Scale
+                  <select value={scale()} onChange={(event) => setScale(event.currentTarget.value as Scale)}>
+                    <option value="focused">Focused</option>
+                    <option value="balanced">Balanced</option>
+                    <option value="wide">Wide</option>
+                  </select>
+                </label>
+              </Show>
+              <label>
+                Model
+                <select value={model()} onChange={(event) => setModel(event.currentTarget.value)}>
+                  <For each={props.data.models}>{(item) => <option value={item}>{item}</option>}</For>
+                </select>
+              </label>
+              <label>
+                Style
+                <select value={style()} onChange={(event) => setStyle(event.currentTarget.value as ProductStyleId)}>
+                  <For each={productStyles}>{(item) => <option value={item.id}>{item.name}</option>}</For>
+                </select>
+              </label>
+              <label>
+                Style notes
+                <input
+                  value={notes()}
+                  onInput={(event) => setNotes(event.currentTarget.value)}
+                  placeholder="Optional style notes"
+                />
+              </label>
+              <label class="attach-control">
+                {files().length ? `${files().length} files` : "Attach"}
+                <input
+                  type="file"
+                  multiple
+                  onChange={(event) => setFiles(Array.from(event.currentTarget.files ?? []))}
+                />
+              </label>
+            </div>
+          </Show>
+        </form>
+      </Show>
     </section>
   )
 }
