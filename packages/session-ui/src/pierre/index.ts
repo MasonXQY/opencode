@@ -152,7 +152,7 @@ ${lineCommentStyles}
 
 export function createDefaultOptions<T>(style: FileDiffOptions<T>["diffStyle"]) {
   return {
-    theme: "OpenCode",
+    theme: "FactorySight",
     themeType: "system",
     disableLineNumbers: false,
     overflow: "wrap",

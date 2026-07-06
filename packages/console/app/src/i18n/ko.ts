@@ -87,7 +87,7 @@ export const dict = {
 
   "temp.title": "OpenCode | 터미널을 위해 만들어진 AI 코딩 에이전트",
   "temp.hero.title": "터미널을 위해 만들어진 AI 코딩 에이전트",
-  "temp.zen": "OpenCode Zen",
+  "temp.zen": "FactorySight Zen",
   "temp.getStarted": "시작하기",
   "temp.feature.native.title": "네이티브 TUI",
   "temp.feature.native.body": "반응형, 네이티브, 테마 적용 가능한 터미널 UI",
@@ -187,12 +187,12 @@ export const dict = {
     "Zen은 OpenCode가 코딩 에이전트를 위해 특별히 테스트하고 벤치마킹한 엄선된 AI 모델 세트에 대한 액세스를 제공합니다. 제공자 간의 일관되지 않은 성능과 품질에 대해 걱정할 필요 없이, 검증된 모델을 사용하세요.",
   "home.zenCta.link": "Zen 알아보기",
 
-  "zen.title": "OpenCode Zen | 코딩 에이전트를 위한 신뢰할 수 있고 최적화된 모델 세트",
+  "zen.title": "FactorySight Zen | 코딩 에이전트를 위한 신뢰할 수 있고 최적화된 모델 세트",
   "zen.hero.title": "코딩 에이전트를 위한 신뢰할 수 있고 최적화된 모델",
   "zen.hero.body":
     "Zen은 OpenCode가 코딩 에이전트를 위해 특별히 테스트하고 벤치마킹한 엄선된 AI 모델 세트에 대한 액세스를 제공합니다. 일관되지 않은 성능과 품질에 대해 걱정할 필요 없이, 검증된 모델을 사용하세요.",
 
-  "zen.faq.q1": "OpenCode Zen이란 무엇인가요?",
+  "zen.faq.q1": "FactorySight Zen이란 무엇인가요?",
   "zen.faq.a1": "Zen은 OpenCode 팀이 코딩 에이전트를 위해 테스트하고 벤치마킹한 엄선된 AI 모델 세트입니다.",
   "zen.faq.q2": "Zen은 왜 더 정확한가요?",
   "zen.faq.a2":

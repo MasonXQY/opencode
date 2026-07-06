@@ -140,6 +140,11 @@ button {
   padding: 10px 12px;
   cursor: pointer;
   box-shadow: var(--presight-shadow-xs);
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease;
 }
 
 button:hover {
@@ -175,6 +180,7 @@ button.danger {
 
 button.danger:hover {
   background: #fee4e2;
+  border-color: #fda29b;
 }
 
 input,
@@ -188,6 +194,10 @@ select {
   padding: 10px 11px;
   outline: none;
   box-shadow: var(--presight-shadow-xs);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease;
 }
 
 input:focus,
@@ -552,7 +562,7 @@ h3 {
 }
 
 .manager-panel {
-  width: min(1120px, 100%);
+  width: min(1180px, 100%);
   height: min(760px, calc(100vh - 48px));
   min-height: 0;
   display: grid;
@@ -590,7 +600,7 @@ h3 {
 .manager-layout {
   min-height: 0;
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: minmax(300px, 340px) minmax(0, 1fr);
 }
 
 .manager-projects,
@@ -598,7 +608,7 @@ h3 {
   min-height: 0;
   display: grid;
   align-content: start;
-  gap: 10px;
+  gap: 12px;
   padding: 16px;
   overflow: auto;
 }
@@ -618,6 +628,12 @@ h3 {
   color: var(--presight-color-gray-800);
   border-color: var(--presight-color-gray-200);
   box-shadow: none;
+}
+
+.manager-project-row > button:first-child:hover,
+.manager-task-row > button:first-child:hover {
+  border-color: var(--presight-color-blue-200);
+  background: var(--presight-color-blue-50);
 }
 
 .manager-project-row.active > button:first-child,
@@ -640,9 +656,37 @@ h3 {
 
 .manager-toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 180px;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   align-items: start;
+}
+
+.manager-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 6px;
+}
+
+.manager-stats span {
+  border: 1px solid var(--presight-color-gray-200);
+  border-radius: 999px;
+  background: var(--presight-color-gray-25);
+  color: var(--presight-color-gray-700);
+  padding: 5px 9px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 800;
+}
+
+.manager-controls {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--presight-color-gray-200);
+  border-radius: var(--presight-radius-lg);
+  background: var(--presight-color-gray-25);
 }
 
 .manager-error,
@@ -680,6 +724,25 @@ h3 {
   gap: 10px;
 }
 
+.manager-empty {
+  display: grid;
+  gap: 4px;
+  padding: 18px;
+  border: 1px dashed var(--presight-color-gray-300);
+  border-radius: var(--presight-radius-lg);
+  background: var(--factory-surface);
+  color: var(--presight-color-gray-600);
+}
+
+.manager-empty strong {
+  color: var(--presight-color-gray-800);
+}
+
+.manager-empty span {
+  font-size: 13px;
+  line-height: 18px;
+}
+
 .manager-project-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
@@ -700,6 +763,19 @@ h3 {
   grid-template-columns: minmax(0, 1fr) auto auto auto;
   gap: 8px;
   align-items: center;
+}
+
+.manager-pending-note {
+  align-self: center;
+  max-width: 190px;
+  color: var(--presight-color-error-700);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 700;
+}
+
+.manager-pending-note.project {
+  max-width: 160px;
 }
 
 .manager-task-row > button:first-child {
@@ -1586,10 +1662,20 @@ h3 {
 
   .manager-layout,
   .manager-toolbar,
+  .manager-controls,
   .manager-confirm,
   .manager-project-row,
   .manager-task-row {
     grid-template-columns: 1fr;
+  }
+
+  .manager-stats {
+    justify-content: start;
+  }
+
+  .manager-pending-note,
+  .manager-pending-note.project {
+    max-width: none;
   }
 
   .manager-projects {
@@ -1701,5 +1787,16 @@ h3 {
   .chain-summary > strong {
     font-size: 20px;
     line-height: 28px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }

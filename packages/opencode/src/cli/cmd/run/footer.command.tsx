@@ -4,6 +4,7 @@ import { useKeyboard, type JSX } from "@opentui/solid"
 import fuzzysort from "fuzzysort"
 import { createEffect, createMemo, createSignal, type Accessor } from "solid-js"
 import { RunFooterMenu, createFooterMenuState, type RunFooterMenuItem } from "./footer.menu"
+import { providerDisplayName } from "./variant.shared"
 import type { RunFooterTheme } from "./theme"
 import type { FooterQueuedPrompt, FooterSubagentTab, RunCommand, RunInput, RunProvider } from "./types"
 
@@ -965,14 +966,15 @@ export function RunModelSelectBody(props: {
                 : title !== modelID
                   ? modelID
                   : undefined
+            const providerName = providerDisplayName(provider.id, provider.name)
             return {
               providerID: provider.id,
               modelID,
-              providerName: provider.name,
-              category: provider.name,
+              providerName,
+              category: providerName,
               display: title,
               footer,
-              keywords: `${provider.id} ${provider.name} ${modelID} ${title} ${footer ?? ""}`,
+              keywords: `${provider.id} ${providerName} ${modelID} ${title} ${footer ?? ""}`,
               current,
             }
           }),

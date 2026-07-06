@@ -85,7 +85,7 @@ export const dict = {
 
   "temp.title": "OpenCode | Agent de code IA conçu pour le terminal",
   "temp.hero.title": "L'agent de code IA conçu pour le terminal",
-  "temp.zen": "OpenCode Zen",
+  "temp.zen": "FactorySight Zen",
   "temp.getStarted": "Commencer",
   "temp.feature.native.title": "TUI Native",
   "temp.feature.native.body": "Une interface terminal native, réactive et thémable",
@@ -189,12 +189,12 @@ export const dict = {
     "Zen vous donne accès à un ensemble sélectionné de modèles d'IA que OpenCode a testés et benchmarkés spécifiquement pour les agents de code. Plus besoin de vous soucier des variations de performance et de qualité selon les fournisseurs : utilisez des modèles validés qui fonctionnent.",
   "home.zenCta.link": "En savoir plus sur Zen",
 
-  "zen.title": "OpenCode Zen | Un ensemble sélectionné de modèles fiables et optimisés pour les agents de code",
+  "zen.title": "FactorySight Zen | Un ensemble sélectionné de modèles fiables et optimisés pour les agents de code",
   "zen.hero.title": "Modèles fiables et optimisés pour les agents de code",
   "zen.hero.body":
     "Zen vous donne accès à un ensemble sélectionné de modèles d'IA que OpenCode a testés et benchmarkés spécifiquement pour les agents de code. Plus besoin de vous soucier des variations de performance et de qualité selon les fournisseurs : utilisez des modèles validés qui fonctionnent.",
 
-  "zen.faq.q1": "Qu'est-ce que OpenCode Zen ?",
+  "zen.faq.q1": "Qu'est-ce que FactorySight Zen ?",
   "zen.faq.a1":
     "Zen est un ensemble sélectionné de modèles d'IA testés et benchmarkés pour les agents de code, créé par l'équipe derrière OpenCode.",
   "zen.faq.q2": "Qu'est-ce qui rend Zen plus précis ?",

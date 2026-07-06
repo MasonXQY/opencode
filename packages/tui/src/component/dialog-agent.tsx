@@ -9,10 +9,12 @@ export function DialogAgent() {
 
   const options = createMemo(() =>
     local.agent.list().map((item) => {
+      const kind = item.mode === "subagent" ? "sub-agent" : "primary"
+      const description = item.native ? `native · ${kind}` : `${kind} · ${item.description}`
       return {
         value: item.name,
         title: item.name,
-        description: item.native ? "native" : item.description,
+        description,
       }
     }),
   )

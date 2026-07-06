@@ -488,6 +488,23 @@
         "vite": "catalog:",
       },
     },
+    "packages/factorysight-remote": {
+      "name": "@opencode-ai/factorysight-remote",
+      "version": "0.1.0",
+      "dependencies": {
+        "hono": "catalog:",
+        "solid-js": "catalog:",
+        "vite": "catalog:",
+        "vite-plugin-solid": "catalog:",
+        "zod": "catalog:",
+      },
+      "devDependencies": {
+        "@tsconfig/bun": "catalog:",
+        "@types/bun": "catalog:",
+        "@typescript/native-preview": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
     "packages/function": {
       "name": "@opencode-ai/function",
       "version": "1.17.13",
@@ -558,7 +575,7 @@
       "name": "opencode",
       "version": "1.17.13",
       "bin": {
-        "opencode": "./bin/opencode",
+        "factorysight": "./bin/factorysight",
       },
       "dependencies": {
         "@actions/core": "1.11.1",
@@ -1962,6 +1979,8 @@
     "@opencode-ai/effect-sqlite-node": ["@opencode-ai/effect-sqlite-node@workspace:packages/effect-sqlite-node"],
 
     "@opencode-ai/enterprise": ["@opencode-ai/enterprise@workspace:packages/enterprise"],
+
+    "@opencode-ai/factorysight-remote": ["@opencode-ai/factorysight-remote@workspace:packages/factorysight-remote"],
 
     "@opencode-ai/function": ["@opencode-ai/function@workspace:packages/function"],
 

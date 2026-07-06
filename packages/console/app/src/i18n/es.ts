@@ -192,12 +192,12 @@ export const dict = {
   "home.zenCta.link": "Aprende sobre Zen",
 
   "zen.title":
-    "OpenCode Zen | Un conjunto seleccionado de modelos optimizados y confiables para agentes de codificación",
+    "FactorySight Zen | Un conjunto seleccionado de modelos optimizados y confiables para agentes de codificación",
   "zen.hero.title": "Modelos optimizados y confiables para agentes de codificación",
   "zen.hero.body":
     "Zen te da acceso a un conjunto seleccionado de modelos de IA que OpenCode ha probado y evaluado específicamente para agentes de codificación. No necesitas preocuparte por el rendimiento y la calidad inconsistentes, usa modelos validados que funcionan.",
 
-  "zen.faq.q1": "¿Qué es OpenCode Zen?",
+  "zen.faq.q1": "¿Qué es FactorySight Zen?",
   "zen.faq.a1":
     "Zen es un conjunto seleccionado de modelos de IA probados y evaluados para agentes de codificación, creado por el equipo detrás de OpenCode.",
   "zen.faq.q2": "¿Qué hace a Zen más preciso?",

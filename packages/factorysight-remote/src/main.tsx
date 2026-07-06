@@ -432,6 +432,12 @@ function ProjectTaskManager(props: {
         return [task.title, task.prompt, task.agent, task.model, task.status].join(" ").toLowerCase().includes(q)
       })
   })
+  const activeTaskCount = createMemo(() =>
+    props.data.tasks.filter((task) => task.projectId === projectId() && task.status !== "archived").length,
+  )
+  const archivedTaskCount = createMemo(() =>
+    props.data.tasks.filter((task) => task.projectId === projectId() && task.status === "archived").length,
+  )
   const pendingProjectId = createMemo(() => {
     const target = pendingDelete()
     return target?.kind === "project" ? target.project.id : undefined
@@ -485,7 +491,7 @@ function ProjectTaskManager(props: {
         <div class="manager-header">
           <div>
             <h2>Projects & Tasks</h2>
-            <p>Organize workspaces, inspect task state, and archive completed work.</p>
+            <p>Open, archive, or delete work. Delete is a two-step action on the same row.</p>
           </div>
           <button class="ghost" type="button" onClick={props.onClose}>
             Close
@@ -528,6 +534,7 @@ function ProjectTaskManager(props: {
                       {busyProjectId() === project.id ? "Deleting..." : pendingProjectId() === project.id ? "Confirm delete" : "Delete"}
                     </button>
                     <Show when={pendingProjectId() === project.id}>
+                      <span class="manager-pending-note project">Click again to delete project and tasks.</span>
                       <button class="ghost" type="button" onClick={() => setPendingDelete(undefined)}>
                         Cancel
                       </button>
@@ -545,24 +552,44 @@ function ProjectTaskManager(props: {
             <div class="manager-toolbar">
               <div>
                 <h2>{selectedProject()?.name ?? "No project"}</h2>
-                <p>{selectedProject()?.path}</p>
+                <p>{selectedProject()?.path ?? "Select a project to inspect its tasks."}</p>
               </div>
-              <select value={status()} onChange={(event) => setStatus(event.currentTarget.value as ManagerStatusFilter)}>
-                <option value="active">Active</option>
-                <option value="running">Running</option>
-                <option value="completed">Completed</option>
-                <option value="failed">Failed</option>
-                <option value="archived">Archived</option>
-                <option value="all">All</option>
-              </select>
+              <div class="manager-stats" aria-label="Task summary">
+                <span>{activeTaskCount()} active</span>
+                <span>{archivedTaskCount()} archived</span>
+              </div>
             </div>
-            <input
-              value={query()}
-              onInput={(event) => setQuery(event.currentTarget.value)}
-              placeholder="Search by title, prompt, agent, model, or status"
-            />
+            <div class="manager-controls">
+              <label>
+                Status
+                <select value={status()} onChange={(event) => setStatus(event.currentTarget.value as ManagerStatusFilter)}>
+                  <option value="active">Active</option>
+                  <option value="running">Running</option>
+                  <option value="completed">Completed</option>
+                  <option value="failed">Failed</option>
+                  <option value="archived">Archived</option>
+                  <option value="all">All</option>
+                </select>
+              </label>
+              <label>
+                Search
+                <input
+                  value={query()}
+                  onInput={(event) => setQuery(event.currentTarget.value)}
+                  placeholder="Title, prompt, agent, model, or status"
+                />
+              </label>
+            </div>
             <div class="manager-task-list">
-              <Show when={filteredTasks().length > 0} fallback={<div class="muted">No matching tasks.</div>}>
+              <Show
+                when={filteredTasks().length > 0}
+                fallback={
+                  <div class="manager-empty">
+                    <strong>No matching tasks</strong>
+                    <span>Change the status filter or search terms to widen the list.</span>
+                  </div>
+                }
+              >
                 <For each={filteredTasks()}>
                   {(task) => (
                     <div class="manager-task-row" classList={{ selected: task.id === props.selectedTaskId }}>
@@ -596,6 +623,7 @@ function ProjectTaskManager(props: {
                         {busyTaskId() === task.id ? "Deleting..." : pendingTaskId() === task.id ? "Confirm delete" : "Delete"}
                       </button>
                       <Show when={pendingTaskId() === task.id}>
+                        <span class="manager-pending-note">Click again to delete permanently.</span>
                         <button class="ghost" type="button" onClick={() => setPendingDelete(undefined)}>
                           Cancel
                         </button>

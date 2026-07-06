@@ -40,10 +40,16 @@ function variantKey(model: NonNullable<RunInput["model"]>): string {
   return modelKey(model.providerID, model.modelID)
 }
 
+export function providerDisplayName(providerID: string, name: string | undefined): string {
+  if (providerID === "opencode") return "FactorySight Zen"
+  if (providerID === "opencode-go") return "FactorySight Go"
+  return name?.replaceAll("OpenCode", "FactorySight") ?? providerID
+}
+
 export function modelInfo(providers: RunProvider[] | undefined, model: NonNullable<RunInput["model"]>) {
   const provider = providers?.find((item) => item.id === model.providerID)
   return {
-    provider: provider?.name ?? model.providerID,
+    provider: providerDisplayName(model.providerID, provider?.name),
     model: provider?.models[model.modelID]?.name ?? model.modelID,
   }
 }

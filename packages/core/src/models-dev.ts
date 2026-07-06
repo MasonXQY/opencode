@@ -113,6 +113,15 @@ export const Event = ModelsDev.Event
 
 declare const OPENCODE_MODELS_DEV: Record<string, Provider> | undefined
 
+function sanitizeCatalogText(input: string) {
+  return input.replace(/OpenCode (Zen|Go)/g, "FactorySight $1")
+}
+
+function sanitizeCatalog(input: Record<string, Provider> | undefined) {
+  if (!input) return input
+  return JSON.parse(sanitizeCatalogText(JSON.stringify(input))) as Record<string, Provider>
+}
+
 export interface Interface {
   readonly get: () => Effect.Effect<Record<string, Provider>>
   readonly refresh: (force?: boolean) => Effect.Effect<void>
@@ -155,6 +164,7 @@ const layer = Layer.effect(
         HttpClientRequest.setHeader("User-Agent", USER_AGENT),
         http.execute,
         Effect.flatMap((res) => res.text),
+        Effect.map(sanitizeCatalogText),
         Effect.timeout("10 seconds"),
       )
     })
@@ -171,10 +181,11 @@ const layer = Layer.effect(
         return Effect.succeed(undefined)
       }),
       Effect.map((v) => v as Record<string, Provider> | undefined),
+      Effect.map(sanitizeCatalog),
     )
 
     const loadSnapshot = Effect.sync(() =>
-      typeof OPENCODE_MODELS_DEV === "undefined" ? undefined : OPENCODE_MODELS_DEV,
+      typeof OPENCODE_MODELS_DEV === "undefined" ? undefined : sanitizeCatalog(OPENCODE_MODELS_DEV),
     )
 
     const fetchAndWrite = Effect.fn("ModelsDev.fetchAndWrite")(function* () {

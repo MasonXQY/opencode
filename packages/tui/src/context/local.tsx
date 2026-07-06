@@ -75,7 +75,6 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     }
 
     function createAgent() {
-      const agents = createMemo(() => sync.data.agent.filter((agent) => agent.mode !== "subagent" && !agent.hidden))
       const visibleAgents = createMemo(() => sync.data.agent.filter((agent) => !agent.hidden))
       const [agentStore, setAgentStore] = createStore({
         current: undefined as string | undefined,
@@ -91,13 +90,13 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       ])
       return {
         list() {
-          return agents()
+          return visibleAgents()
         },
         current() {
-          return agents().find((x) => x.name === agentStore.current) ?? agents().at(0)
+          return visibleAgents().find((x) => x.name === agentStore.current) ?? visibleAgents().at(0)
         },
         set(name: string) {
-          if (!agents().some((x) => x.name === name))
+          if (!visibleAgents().some((x) => x.name === name))
             return toast.show({
               variant: "warning",
               message: `Agent not found: ${name}`,
@@ -109,10 +108,10 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           batch(() => {
             const current = this.current()
             if (!current) return
-            let next = agents().findIndex((x) => x.name === current.name) + direction
-            if (next < 0) next = agents().length - 1
-            if (next >= agents().length) next = 0
-            const value = agents()[next]
+            let next = visibleAgents().findIndex((x) => x.name === current.name) + direction
+            if (next < 0) next = visibleAgents().length - 1
+            if (next >= visibleAgents().length) next = 0
+            const value = visibleAgents()[next]
             setAgentStore("current", value.name)
           })
         },

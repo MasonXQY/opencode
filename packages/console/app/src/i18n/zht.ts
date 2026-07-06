@@ -88,7 +88,7 @@ export const dict = {
 
   "temp.title": "OpenCode | 專為終端打造的 AI 編碼代理",
   "temp.hero.title": "專為終端打造的 AI 編碼代理",
-  "temp.zen": "OpenCode Zen",
+  "temp.zen": "FactorySight Zen",
   "temp.getStarted": "開始使用",
   "temp.feature.native.title": "原生 TUI",
   "temp.feature.native.body": "響應式、原生、可自訂主題的終端介面",
@@ -184,12 +184,12 @@ export const dict = {
     "Zen 提供一組精選的 AI 模型，這些模型是 OpenCode 為了編碼代理專門測試與評測過的。無需擔心不同供應商之間效能與品質參差不齊，使用經過驗證的模型即可。",
   "home.zenCta.link": "了解 Zen",
 
-  "zen.title": "OpenCode Zen | 專為編碼代理精選的可靠最佳化模型",
+  "zen.title": "FactorySight Zen | 專為編碼代理精選的可靠最佳化模型",
   "zen.hero.title": "專為編碼代理提供的可靠最佳化模型",
   "zen.hero.body":
     "Zen 提供一組精選的 AI 模型，這些模型是 OpenCode 為了編碼代理專門測試與評測過的。無需擔心效能與品質參差不齊，使用經過驗證的模型即可。",
 
-  "zen.faq.q1": "什麼是 OpenCode Zen？",
+  "zen.faq.q1": "什麼是 FactorySight Zen？",
   "zen.faq.a1": "Zen 是由 OpenCode 團隊打造、專為編碼代理測試與評測的 AI 模型精選集合。",
   "zen.faq.q2": "是什麼讓 Zen 更準確？",
   "zen.faq.a2": "Zen 只提供專為編碼代理測試與評測的模型。你不會用奶油刀切牛排，也別用糟糕的模型來寫程式。",

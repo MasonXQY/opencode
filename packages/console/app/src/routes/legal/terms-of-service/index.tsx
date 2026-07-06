@@ -75,7 +75,7 @@ export default function TermsOfService() {
               <p>
                 OpenCode is an AI-powered coding agent that helps you write, understand, and modify code using large
                 language models. Certain of these large language models are provided by third parties ("Third Party
-                Models") and certain of these models are provided directly by us if you use the OpenCode Zen paid
+                Models") and certain of these models are provided directly by us if you use the FactorySight Zen paid
                 offering ("Zen"). Regardless of whether you use Third Party Models or Zen, OpenCode enables you to
                 access the functionality of models through a coding agent running within your terminal.
               </p>

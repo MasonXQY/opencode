@@ -88,7 +88,7 @@ export const dict = {
 
   "temp.title": "OpenCode | 专为终端打造的 AI 编程代理",
   "temp.hero.title": "专为终端打造的 AI 编程代理",
-  "temp.zen": "OpenCode Zen",
+  "temp.zen": "FactorySight Zen",
   "temp.getStarted": "开始使用",
   "temp.feature.native.title": "原生 TUI",
   "temp.feature.native.body": "响应迅速、原生的、可定制主题的终端 UI",
@@ -184,12 +184,12 @@ export const dict = {
     "Zen 为您提供一组精选的 AI 模型，这些模型经过 OpenCode 专门针对编程代理的测试和基准测试。无需担心不同提供商之间不稳定的性能和质量，直接使用行之有效的验证模型。",
   "home.zenCta.link": "了解 Zen",
 
-  "zen.title": "OpenCode Zen | 为编程代理精选的可靠、优化模型",
+  "zen.title": "FactorySight Zen | 为编程代理精选的可靠、优化模型",
   "zen.hero.title": "为编程代理打造的可靠、优化模型",
   "zen.hero.body":
     "Zen 为您提供一组精选的 AI 模型，这些模型经过 OpenCode 专门针对编程代理的测试和基准测试。无需担心不稳定的性能和质量，直接使用行之有效的验证模型。",
 
-  "zen.faq.q1": "什么是 OpenCode Zen？",
+  "zen.faq.q1": "什么是 FactorySight Zen？",
   "zen.faq.a1": "Zen 是一组由 OpenCode 团队创建的，专门针对编程代理进行测试和基准测试的 AI 模型精选集。",
   "zen.faq.q2": "为什么 Zen 更准确？",
   "zen.faq.a2":

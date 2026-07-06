@@ -472,7 +472,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
           headers: {
             "HTTP-Referer": "https://opencode.ai/",
             "X-Title": "opencode",
-            "X-BILLING-INVOKE-ORIGIN": "OpenCode",
+            "X-BILLING-INVOKE-ORIGIN": "FactorySight",
           },
         },
       }),
@@ -1267,7 +1267,7 @@ export function fromModelsDevProvider(provider: ModelsDev.Provider): Info {
   return {
     id: ProviderV2.ID.make(provider.id),
     source: "custom",
-    name: provider.name,
+    name: provider.name.replace(/OpenCode (Zen|Go)/g, "FactorySight $1"),
     env: [...(provider.env ?? [])],
     options: {},
     models,
