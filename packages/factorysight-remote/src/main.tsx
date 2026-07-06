@@ -394,6 +394,8 @@ function CanvasWorkspace(props: {
   const [libraryTab, setLibraryTab] = createSignal<LibraryTab>("projects")
   const [workspaceView, setWorkspaceView] = createSignal<WorkspaceView>("workflow")
   const [composerFocusRequest, setComposerFocusRequest] = createSignal(0)
+  const [workspaceDrawerOpen, setWorkspaceDrawerOpen] = createSignal(false)
+  const [detailsDrawerOpen, setDetailsDrawerOpen] = createSignal(false)
   const activeProject = createMemo(() => props.data.projects.find((project) => project.id === activeProjectId()))
   const projectTasks = createMemo(() =>
     props.data.tasks.filter((task) => task.projectId === activeProjectId() && task.status !== "archived"),
@@ -442,22 +444,29 @@ function CanvasWorkspace(props: {
         onLogout={props.onLogout}
         view={workspaceView()}
         onView={setWorkspaceView}
+        workspaceOpen={workspaceDrawerOpen()}
+        detailsOpen={detailsDrawerOpen()}
+        onWorkspaceOpen={() => setWorkspaceDrawerOpen((value) => !value)}
+        onDetailsOpen={() => setDetailsDrawerOpen((value) => !value)}
       />
       <section class="fs-stage">
-        <ToolLibrary
-          data={props.data}
-          api={props.api}
-          tab={libraryTab()}
-          onTab={setLibraryTab}
-          activeProjectId={activeProjectId()}
-          onProject={(id) => {
-            setActiveProjectId(id)
-            props.onSelectTask(undefined)
-          }}
-          files={activeFiles()}
-          artifacts={activeArtifacts()}
-          onRefresh={props.onRefresh}
-        />
+        <Show when={workspaceDrawerOpen()}>
+          <ToolLibrary
+            data={props.data}
+            api={props.api}
+            tab={libraryTab()}
+            onTab={setLibraryTab}
+            activeProjectId={activeProjectId()}
+            onProject={(id) => {
+              setActiveProjectId(id)
+              props.onSelectTask(undefined)
+              setWorkspaceDrawerOpen(false)
+            }}
+            files={activeFiles()}
+            artifacts={activeArtifacts()}
+            onRefresh={props.onRefresh}
+          />
+        </Show>
         <Show
           when={workspaceView() === "cli"}
           fallback={
@@ -489,17 +498,19 @@ function CanvasWorkspace(props: {
             onStartWorkflow={() => setComposerFocusRequest((value) => value + 1)}
           />
         </Show>
-        <NodeInspector
-          data={props.data}
-          api={props.api}
-          project={activeProject()}
-          task={selectedTask()}
-          chainTasks={chainTasks()}
-          artifacts={activeArtifacts()}
-          files={activeFiles()}
-          onSelectTask={props.onSelectTask}
-          onRefresh={props.onRefresh}
-        />
+        <Show when={detailsDrawerOpen()}>
+          <NodeInspector
+            data={props.data}
+            api={props.api}
+            project={activeProject()}
+            task={selectedTask()}
+            chainTasks={chainTasks()}
+            artifacts={activeArtifacts()}
+            files={activeFiles()}
+            onSelectTask={props.onSelectTask}
+            onRefresh={props.onRefresh}
+          />
+        </Show>
       </section>
       <MissionCommandBar
         data={props.data}
@@ -524,6 +535,10 @@ function TopBar(props: {
   onLogout: () => void
   view: WorkspaceView
   onView: (view: WorkspaceView) => void
+  workspaceOpen: boolean
+  detailsOpen: boolean
+  onWorkspaceOpen: () => void
+  onDetailsOpen: () => void
 }) {
   return (
     <header class="topbar">
@@ -547,6 +562,22 @@ function TopBar(props: {
         <span>{props.data.backendMode === "factorysight" ? "FactorySight backend" : "Local backend"}</span>
       </div>
       <div class="top-actions">
+        <button
+          class="secondary"
+          classList={{ active: props.workspaceOpen }}
+          onClick={props.onWorkspaceOpen}
+          aria-pressed={props.workspaceOpen}
+        >
+          Workspace
+        </button>
+        <button
+          class="secondary"
+          classList={{ active: props.detailsOpen }}
+          onClick={props.onDetailsOpen}
+          aria-pressed={props.detailsOpen}
+        >
+          Details
+        </button>
         <div class="view-toggle" aria-label="Workspace view">
           <button
             classList={{ active: props.view === "workflow" }}
