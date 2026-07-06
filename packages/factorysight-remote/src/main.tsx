@@ -40,6 +40,7 @@ type FlowNode = {
   agent?: string
   taskId?: string
   meta?: string
+  previews?: FlowPreview[]
 }
 type FlowEdge = {
   id: string
@@ -47,6 +48,20 @@ type FlowEdge = {
   to: FlowNode
   label: string
   loop?: boolean
+}
+type FlowPreview = {
+  id: string
+  title: string
+  subtitle: string
+  kind: "file" | "artifact"
+  href: string
+  media?: "image" | "html"
+}
+type ProjectFlow = {
+  nodes: FlowNode[]
+  edges: FlowEdge[]
+  width: number
+  height: number
 }
 type SpeechRecognitionResultLike = {
   isFinal: boolean
@@ -140,22 +155,60 @@ function buildProjectFlow(input: {
   chainTasks: Task[]
   artifacts: Artifact[]
   files: FileAttachment[]
-  selectedTaskId: string | undefined
-}) {
+  artifactToken: string | undefined
+  fileUrl: (file: FileAttachment) => string
+}): ProjectFlow {
+  const nodeWidth = 228
+  const nodeHeight = 172
+  const columnGap = 300
+  const rowGap = 206
+  const canvasPad = 96
+  const inputX = 90
+  const plannerX = inputX + columnGap
   const runs = (input.chainTasks.length ? input.chainTasks : input.tasks.slice(0, 8)).filter(
     (task, index, all) => all.findIndex((item) => item.id === task.id) === index,
   )
   const nodes: FlowNode[] = []
+  const filePreviews = input.files.slice(0, 3).map((file): FlowPreview => {
+    const extension = file.name.split(".").at(-1)?.toUpperCase() ?? "FILE"
+    return {
+      id: file.id,
+      title: file.originalName,
+      subtitle: `${extension} · ${formatBytes(file.size)}`,
+      kind: "file",
+      href: input.fileUrl(file),
+      media: filePreviewMedia(file),
+    }
+  })
+  const artifactPreviews = input.artifacts.slice(0, 3).map(
+    (artifact): FlowPreview => ({
+      id: `${artifact.projectId}:${artifact.relativePath}`,
+      title: artifact.name,
+      subtitle: artifact.relativePath,
+      kind: "artifact",
+      href: artifactUrl(artifact.projectId, artifact.relativePath, input.artifactToken),
+      media: artifactPreviewMedia(artifact),
+    }),
+  )
+  const children = runs.slice(1)
+  const childColumnCount = Math.max(1, Math.ceil(children.length / 4))
+  const rowsInLargestColumn = Math.max(1, Math.min(4, children.length || 1))
+  const graphHeight = Math.max(
+    620,
+    canvasPad * 2 + rowsInLargestColumn * nodeHeight + (rowsInLargestColumn - 1) * rowGap,
+  )
+  const centerY = Math.round(graphHeight / 2 - nodeHeight / 2)
   const inputNode: FlowNode = {
     id: "flow-input",
     kind: "input",
-    x: 80,
-    y: 230,
+    x: inputX,
+    y: centerY,
     title: "Project requirement",
     subtitle: input.project ? "Text, voice, and attached files" : "Create a project first",
     meta: input.files.length
       ? `${input.files.length} file${input.files.length === 1 ? "" : "s"} attached`
       : "No files attached",
+    previews: filePreviews,
   }
   nodes.push(inputNode)
 
@@ -163,8 +216,8 @@ function buildProjectFlow(input: {
     nodes.push({
       id: "flow-placeholder",
       kind: "placeholder",
-      x: 410,
-      y: 230,
+      x: plannerX,
+      y: centerY,
       title: "Flow will be generated",
       subtitle: "FactorySight analyzes the requirement and creates a topology.",
       meta: "Tree, branch, or loop",
@@ -175,23 +228,25 @@ function buildProjectFlow(input: {
       id: root.id,
       taskId: root.id,
       kind: root.kind === "orchestration" ? "planner" : "agent",
-      x: 390,
-      y: 230,
+      x: plannerX,
+      y: centerY,
       title: root.kind === "orchestration" ? "Primary planner" : root.title,
       subtitle: `${taskStage(root)} · ${root.agent}`,
       status: root.status,
       agent: root.agent,
     })
-    const children = runs.slice(1)
-    const rowGap = children.length > 4 ? 104 : 126
-    const startY = Math.max(70, 230 - ((children.length - 1) * rowGap) / 2)
     children.forEach((task, index) => {
+      const column = Math.floor(index / 4)
+      const row = index % 4
+      const rowsInColumn = Math.min(4, children.length - column * 4)
+      const columnHeight = rowsInColumn * nodeHeight + (rowsInColumn - 1) * (rowGap - nodeHeight)
+      const startY = Math.round(graphHeight / 2 - columnHeight / 2)
       nodes.push({
         id: task.id,
         taskId: task.id,
         kind: "agent",
-        x: 700 + Math.floor(index / 5) * 270,
-        y: startY + (index % 5) * rowGap,
+        x: plannerX + columnGap + column * columnGap,
+        y: startY + row * rowGap,
         title: task.title,
         subtitle: `${taskStage(task)} · ${task.agent}`,
         status: task.status,
@@ -200,16 +255,18 @@ function buildProjectFlow(input: {
     })
   }
 
+  const outputX = plannerX + columnGap + childColumnCount * columnGap
   const outputNode: FlowNode = {
     id: "flow-output",
     kind: "artifact",
-    x: runs.length > 6 ? 1260 : 1020,
-    y: 230,
+    x: outputX,
+    y: centerY,
     title: "Artifact output",
     subtitle: input.artifacts.length ? "Project deliverables are ready" : "Outputs appear here after the run",
     meta: input.artifacts.length
       ? `${input.artifacts.length} artifact${input.artifacts.length === 1 ? "" : "s"}`
       : "No artifacts yet",
+    previews: artifactPreviews,
   }
   nodes.push(outputNode)
 
@@ -239,7 +296,12 @@ function buildProjectFlow(input: {
   if (root && failedNode && root.id !== failedNode.id) {
     edges.push({ id: `edge-loop-${failedNode.id}`, from: failedNode, to: root, label: "retry loop", loop: true })
   }
-  return { nodes, edges }
+  return {
+    nodes,
+    edges,
+    width: outputX + nodeWidth + canvasPad,
+    height: graphHeight,
+  }
 }
 
 function eventDigest(events: TaskEvent[]) {
@@ -260,6 +322,16 @@ function artifactUrl(projectId: string, relativePath: string, token: string | un
   const encoded = relativePath.split("/").map(encodeURIComponent).join("/")
   const suffix = token ? `?token=${encodeURIComponent(token)}` : ""
   return `/api/projects/${encodeURIComponent(projectId)}/artifacts/${encoded}${suffix}`
+}
+
+function filePreviewMedia(file: FileAttachment): FlowPreview["media"] | undefined {
+  if (file.type.startsWith("image/")) return "image"
+  if (file.type === "text/html") return "html"
+}
+
+function artifactPreviewMedia(artifact: Artifact): FlowPreview["media"] | undefined {
+  if (/\.(html?|svg)$/i.test(artifact.relativePath)) return "html"
+  if (/\.(png|jpe?g|gif|webp|avif)$/i.test(artifact.relativePath)) return "image"
 }
 
 function productPrompt(input: { prompt: string; style: ProductStyleId; notes: string }) {
@@ -472,6 +544,7 @@ function CanvasWorkspace(props: {
           fallback={
             <WorkflowCanvas
               data={props.data}
+              api={props.api}
               project={activeProject()}
               tasks={projectTasks()}
               chainTasks={chainTasks()}
@@ -826,6 +899,7 @@ function ProjectFiles(props: {
 }) {
   const [files, setFiles] = createSignal<File[]>([])
   const [busy, setBusy] = createSignal(false)
+  const [configOpen, setConfigOpen] = createSignal(false)
   return (
     <Panel heading="Files" meta={`${props.files.length} project`}>
       <form
@@ -867,6 +941,7 @@ function ProjectFiles(props: {
 
 function WorkflowCanvas(props: {
   data: BootstrapData
+  api: ApiClient
   project: Project | undefined
   tasks: Task[]
   chainTasks: Task[]
@@ -888,7 +963,8 @@ function WorkflowCanvas(props: {
       chainTasks: props.chainTasks,
       artifacts: props.artifacts,
       files: props.files,
-      selectedTaskId: props.selectedTaskId,
+      artifactToken: props.api.getToken(),
+      fileUrl: (file) => props.api.projectFileUrl(file.projectId, file.id),
     }),
   )
   const [zoom, setZoom] = createSignal(1)
@@ -903,6 +979,11 @@ function WorkflowCanvas(props: {
   const fitCanvas = () => {
     setZoom(flow().nodes.length > 7 ? 0.78 : 0.92)
     requestAnimationFrame(() => nodeViewport?.scrollTo({ left: 0, behavior: "smooth" }))
+  }
+  const autoLayout = () => {
+    const nextZoom = flow().width > 1300 || flow().height > 720 ? 0.76 : 0.9
+    setZoom(nextZoom)
+    requestAnimationFrame(() => nodeViewport?.scrollTo({ left: 0, top: 0, behavior: "smooth" }))
   }
 
   createEffect(() => {
@@ -948,14 +1029,20 @@ function WorkflowCanvas(props: {
           <button type="button" class="secondary" onClick={fitCanvas}>
             Fit
           </button>
+          <button type="button" class="secondary" onClick={autoLayout}>
+            Auto layout
+          </button>
           <button type="button" class="secondary" onClick={focusSelectedNode}>
             Focus
           </button>
         </div>
       </div>
       <div class="node-viewport" ref={nodeViewport}>
-        <div class="node-flow graph-flow" style={{ "--canvas-zoom": zoom() }}>
-          <FlowEdges edges={flow().edges} />
+        <div
+          class="node-flow graph-flow"
+          style={{ "--canvas-zoom": zoom(), width: `${flow().width}px`, height: `${flow().height}px` }}
+        >
+          <FlowEdges edges={flow().edges} width={flow().width} height={flow().height} />
           <For each={flow().nodes}>
             {(node, index) => (
               <FlowNodeCard
@@ -988,12 +1075,12 @@ function CanvasEmpty() {
   )
 }
 
-function FlowEdges(props: { edges: FlowEdge[] }) {
+function FlowEdges(props: { edges: FlowEdge[]; width: number; height: number }) {
   const pathFor = (edge: FlowEdge) => {
-    const fromX = edge.from.x + 206
-    const fromY = edge.from.y + 42
+    const fromX = edge.from.x + 228
+    const fromY = edge.from.y + 70
     const toX = edge.to.x
-    const toY = edge.to.y + 42
+    const toY = edge.to.y + 70
     if (edge.loop) {
       const controlY = Math.min(fromY, toY) - 120
       return `M ${fromX} ${fromY} C ${fromX + 90} ${controlY}, ${toX - 90} ${controlY}, ${toX} ${toY}`
@@ -1002,11 +1089,11 @@ function FlowEdges(props: { edges: FlowEdge[] }) {
     return `M ${fromX} ${fromY} C ${fromX + middle} ${fromY}, ${toX - middle} ${toY}, ${toX} ${toY}`
   }
   const labelPoint = (edge: FlowEdge) => ({
-    x: (edge.from.x + edge.to.x) / 2 + 98,
-    y: (edge.from.y + edge.to.y) / 2 + 24,
+    x: (edge.from.x + edge.to.x) / 2 + 110,
+    y: (edge.from.y + edge.to.y) / 2 + 36,
   })
   return (
-    <svg class="flow-edges" viewBox="0 0 1460 620" aria-hidden="true">
+    <svg class="flow-edges" viewBox={`0 0 ${props.width} ${props.height}`} aria-hidden="true">
       <defs>
         <marker id="flow-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto">
           <path d="M 0 0 L 10 5 L 0 10 z" />
@@ -1076,6 +1163,35 @@ function FlowNodeCard(props: {
       </Show>
       <strong>{props.node.title}</strong>
       <small>{props.node.subtitle}</small>
+      <Show when={props.node.previews?.length}>
+        <div class="flow-previews">
+          <For each={props.node.previews}>
+            {(preview) => (
+              <div class={`flow-preview ${preview.kind}`}>
+                <div class="flow-preview-thumb">
+                  <Show
+                    when={preview.media === "image"}
+                    fallback={
+                      <Show
+                        when={preview.media === "html"}
+                        fallback={<span>{preview.kind === "artifact" ? "OUT" : "IN"}</span>}
+                      >
+                        <iframe src={preview.href} title={preview.title} loading="lazy" />
+                      </Show>
+                    }
+                  >
+                    <img src={preview.href} alt="" loading="lazy" />
+                  </Show>
+                </div>
+                <div>
+                  <strong>{preview.title}</strong>
+                  <small>{preview.subtitle}</small>
+                </div>
+              </div>
+            )}
+          </For>
+        </div>
+      </Show>
       <Show when={props.node.meta || props.node.status}>
         <span class={`flow-node-meta ${props.node.status ?? ""}`}>
           {props.node.meta ?? statusLabel(props.node.status!)}
@@ -1411,6 +1527,7 @@ function MissionCommandBar(props: {
   const [notes, setNotes] = createSignal("")
   const [files, setFiles] = createSignal<File[]>([])
   const [busy, setBusy] = createSignal(false)
+  const [configOpen, setConfigOpen] = createSignal(false)
   const [listening, setListening] = createSignal(false)
   const [voiceError, setVoiceError] = createSignal("")
   const [submitError, setSubmitError] = createSignal("")
@@ -1552,50 +1669,80 @@ function MissionCommandBar(props: {
               <small>{voiceError()}</small>
             </Show>
           </div>
-        </div>
-        <Show when={submitError()}>
-          <div class="composer-error">{submitError()}</div>
-        </Show>
-        <div class="mission-options">
-          <div class="mission-selects">
-            <select value={mode()} onChange={(event) => setMode(event.currentTarget.value as ComposeMode)}>
-              <option value="swarm">Agent swarm</option>
-              <option value="direct">Direct agent</option>
-            </select>
-            <Show
-              when={mode() === "swarm"}
-              fallback={
-                <select value={agent()} onChange={(event) => setAgent(event.currentTarget.value)}>
-                  <For each={props.data.agents}>
-                    {(item) => <option value={item}>{props.data.agentProfiles[item]?.name ?? item}</option>}
-                  </For>
-                </select>
-              }
+          <div class="mission-inline-actions">
+            <button
+              type="button"
+              class="secondary"
+              classList={{ active: configOpen() }}
+              onClick={() => setConfigOpen((value) => !value)}
             >
-              <select value={scale()} onChange={(event) => setScale(event.currentTarget.value as Scale)}>
-                <option value="focused">Focused</option>
-                <option value="balanced">Balanced</option>
-                <option value="wide">Wide</option>
-              </select>
-            </Show>
-            <select value={model()} onChange={(event) => setModel(event.currentTarget.value)}>
-              <For each={props.data.models}>{(item) => <option value={item}>{item}</option>}</For>
-            </select>
-            <select value={style()} onChange={(event) => setStyle(event.currentTarget.value as ProductStyleId)}>
-              <For each={productStyles}>{(item) => <option value={item.id}>{item.name}</option>}</For>
-            </select>
-            <input value={notes()} onInput={(event) => setNotes(event.currentTarget.value)} placeholder="Style notes" />
-          </div>
-          <div class="mission-actions">
-            <label class="attach-control">
-              {files().length ? `${files().length} files` : "Attach"}
-              <input type="file" multiple onChange={(event) => setFiles(Array.from(event.currentTarget.files ?? []))} />
-            </label>
+              Config
+            </button>
             <button disabled={!props.project || !prompt().trim() || busy()}>
               {busy() ? "Launching..." : "Launch"}
             </button>
           </div>
         </div>
+        <Show when={submitError()}>
+          <div class="composer-error">{submitError()}</div>
+        </Show>
+        <Show when={configOpen()}>
+          <div class="mission-config">
+            <label>
+              Mode
+              <select value={mode()} onChange={(event) => setMode(event.currentTarget.value as ComposeMode)}>
+                <option value="swarm">Agent swarm</option>
+                <option value="direct">Direct agent</option>
+              </select>
+            </label>
+            <Show
+              when={mode() === "swarm"}
+              fallback={
+                <label>
+                  Agent
+                  <select value={agent()} onChange={(event) => setAgent(event.currentTarget.value)}>
+                    <For each={props.data.agents}>
+                      {(item) => <option value={item}>{props.data.agentProfiles[item]?.name ?? item}</option>}
+                    </For>
+                  </select>
+                </label>
+              }
+            >
+              <label>
+                Scale
+                <select value={scale()} onChange={(event) => setScale(event.currentTarget.value as Scale)}>
+                  <option value="focused">Focused</option>
+                  <option value="balanced">Balanced</option>
+                  <option value="wide">Wide</option>
+                </select>
+              </label>
+            </Show>
+            <label>
+              Model
+              <select value={model()} onChange={(event) => setModel(event.currentTarget.value)}>
+                <For each={props.data.models}>{(item) => <option value={item}>{item}</option>}</For>
+              </select>
+            </label>
+            <label>
+              Style
+              <select value={style()} onChange={(event) => setStyle(event.currentTarget.value as ProductStyleId)}>
+                <For each={productStyles}>{(item) => <option value={item.id}>{item.name}</option>}</For>
+              </select>
+            </label>
+            <label>
+              Style notes
+              <input
+                value={notes()}
+                onInput={(event) => setNotes(event.currentTarget.value)}
+                placeholder="Optional style notes"
+              />
+            </label>
+            <label class="attach-control">
+              {files().length ? `${files().length} files` : "Attach"}
+              <input type="file" multiple onChange={(event) => setFiles(Array.from(event.currentTarget.files ?? []))} />
+            </label>
+          </div>
+        </Show>
       </form>
     </section>
   )
