@@ -45,6 +45,23 @@ async function writeManifest(projectPath: string, files: FileAttachment[]) {
   await writeFile(manifestPath(projectPath), JSON.stringify(files, null, 2))
 }
 
+function fileKey(file: FileAttachment) {
+  if (file.scope === "project") return `${file.projectId}:project:${file.originalName}`
+  return `${file.projectId}:task:${file.taskId}:${file.originalName}:${file.relativePath}`
+}
+
+function dedupeFiles(files: FileAttachment[]) {
+  const byKey = new Map<string, FileAttachment>()
+  for (const file of files) {
+    const key = fileKey(file)
+    const existing = byKey.get(key)
+    if (!existing || new Date(file.createdAt).getTime() >= new Date(existing.createdAt).getTime()) {
+      byKey.set(key, file)
+    }
+  }
+  return [...byKey.values()].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+}
+
 async function uniqueFilePath(dir: string, fileName: string) {
   const parsed = path.parse(fileName)
   let candidate = path.join(dir, fileName)
@@ -82,12 +99,24 @@ export async function saveUploadedFile(input: {
       : path.join(input.projectPath, uploadsDir, "tasks", safeSegment(input.taskId ?? "unassigned"))
   await mkdir(targetDir, { recursive: true })
 
-  const targetPath = await uniqueFilePath(targetDir, sanitizeFileName(input.file.name))
+  const files = await readManifest(input.projectPath)
+  const existing =
+    input.scope === "project"
+      ? files.find(
+          (file) =>
+            file.scope === "project" &&
+            file.projectId === input.projectId &&
+            file.originalName === input.file.name,
+        )
+      : undefined
+  const targetPath = existing
+    ? path.join(input.projectPath, existing.relativePath)
+    : await uniqueFilePath(targetDir, sanitizeFileName(input.file.name))
   await writeFile(targetPath, Buffer.from(await input.file.arrayBuffer()))
 
   const relativePath = toPosix(path.relative(input.projectPath, targetPath))
   const attachment: FileAttachment = {
-    id: `file_${randomUUID().replaceAll("-", "").slice(0, 16)}`,
+    id: existing?.id ?? `file_${randomUUID().replaceAll("-", "").slice(0, 16)}`,
     projectId: input.projectId,
     taskId: input.taskId,
     scope: input.scope,
@@ -100,14 +129,20 @@ export async function saveUploadedFile(input: {
     createdAt: now(),
   }
 
-  const files = await readManifest(input.projectPath)
-  files.push(attachment)
+  if (existing) {
+    files.splice(files.indexOf(existing), 1, attachment)
+  } else {
+    files.push(attachment)
+  }
   await writeManifest(input.projectPath, files)
   return attachment
 }
 
 export async function listProjectFiles(projectPath: string) {
-  return readManifest(projectPath)
+  const files = await readManifest(projectPath)
+  const deduped = dedupeFiles(files)
+  if (deduped.length !== files.length) await writeManifest(projectPath, deduped)
+  return deduped
 }
 
 export async function deleteTaskFiles(projectPath: string, taskIds: string[]) {
