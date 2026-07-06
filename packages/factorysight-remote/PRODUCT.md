@@ -6,11 +6,15 @@ product
 
 ## Users
 
-FactorySight Remote is for engineers and technical leads coordinating local FactorySight agent runs from a browser. They use it while moving between devices, tracking active work, sharing task state, and reviewing agent output without staying attached to a local terminal.
+FactorySight Remote is for engineers and technical leads coordinating FactorySight agent runs from a browser or desktop shell. They use it while moving between devices, tracking active work, sharing task state, and reviewing agent output without staying attached to a local terminal.
 
 ## Product Purpose
 
-The product turns a local FactorySight engine into a web-facing control plane: sign in, register projects by server path, launch direct or swarm tasks, monitor live events, review artifacts, tune project permissions, and share sessions. Success means users can understand what is running, what changed, what needs attention, and what can be opened or approved in seconds.
+The product turns the FactorySight backend into a web-facing control plane: sign in, register projects by server path, launch direct or swarm tasks, monitor live events, review artifacts, tune project permissions, and share sessions. Success means users can understand what is running, what changed, what needs attention, and what can be opened or approved in seconds.
+
+## Backend Boundary
+
+FactorySight/opencode owns backend execution, including agent orchestration, model calls, permission enforcement, task status transitions, file writes, and artifact generation. Remote and the Mac desktop app are frontends plus thin gateway surfaces. They should not become an alternate backend runtime.
 
 ## Brand Personality
 

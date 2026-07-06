@@ -1,6 +1,10 @@
 # FactorySight Remote
 
-FactorySight Remote is the first web-facing shell around the local FactorySight engine.
+FactorySight Remote is the web-facing shell around the local FactorySight engine.
+
+Remote is not the product backend. FactorySight/opencode owns backend execution: task running, model calls,
+agent orchestration, permissions, and generated artifacts. Remote provides the browser and desktop control
+surface, plus a thin local gateway where needed for auth, uploads, static assets, and event display.
 
 It provides:
 
@@ -9,8 +13,8 @@ It provides:
 - task assignment with agent, model, and visibility controls
 - live task event streaming across devices
 - task sharing for collaborative sessions
-- a real runner that calls the local `factorysight run` command
-- an optional demo runner for local UI validation
+- a FactorySight backend adapter for model discovery and task execution
+- a local-dev backend adapter for UI development and regression testing
 
 ## Run
 
@@ -27,6 +31,16 @@ FACTORYSIGHT_REMOTE_RUNNER=mock bun run dev:remote
 ```
 
 State is stored in `~/.factorysight-remote/state.json` by default. Override it with `FACTORYSIGHT_REMOTE_DATA`.
+
+## Backend Modes
+
+Remote supports two backend modes:
+
+- `FACTORYSIGHT_REMOTE_BACKEND=factorysight`: task execution and model discovery go through FactorySight. The adapter prefers `factorysight api` when available and falls back to the installed FactorySight CLI transport for current installations.
+- `FACTORYSIGHT_REMOTE_BACKEND=local`: local development compatibility mode. This is the browser dev default.
+
+The desktop app defaults to `factorysight`. Browser development defaults to `local` until the remaining MVP
+storage and artifact APIs are moved behind FactorySight endpoints.
 
 ## Backend Permission Controls
 
@@ -62,4 +76,5 @@ Available levels:
 - `auto_safe`
 - `full_auto`
 
-Only `full_auto` passes `--auto` to the local FactorySight runner.
+In `factorysight` backend mode, permission behavior is owned by FactorySight. In `local` backend mode,
+only `full_auto` passes `--auto` to the compatibility runner.

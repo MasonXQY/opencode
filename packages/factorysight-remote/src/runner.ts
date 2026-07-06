@@ -69,7 +69,7 @@ async function gitStatus(projectPath: string) {
   }
 }
 
-async function appendDeliverable(task: Task, projectPath: string, exitCode: number) {
+export async function appendDeliverable(task: Task, projectPath: string, exitCode: number) {
   const files = await gitStatus(projectPath)
   await appendEvent(task.id, {
     type: "deliverable",
@@ -86,7 +86,7 @@ async function appendDeliverable(task: Task, projectPath: string, exitCode: numb
   })
 }
 
-async function attachedFileContext(task: Task, projectPath: string) {
+export async function attachedFileContext(task: Task, projectPath: string) {
   const files = (await listProjectFiles(projectPath)).filter(
     (file) => file.scope === "project" || file.taskId === task.id || file.taskId === task.parentTaskId,
   )

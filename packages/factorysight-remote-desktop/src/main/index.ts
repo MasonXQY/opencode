@@ -34,6 +34,7 @@ async function startRemoteServer() {
   process.env.FACTORYSIGHT_REMOTE_PORT = String(port)
   process.env.FACTORYSIGHT_REMOTE_CLIENT_DIR = remoteClientDir()
   process.env.FACTORYSIGHT_REMOTE_DATA ??= join(app.getPath("userData"), "data")
+  process.env.FACTORYSIGHT_REMOTE_BACKEND ??= "factorysight"
   process.env.OPENCODE_DISABLE_AUTOUPDATE = "1"
 
   const { app: remoteApp } = await import("../../../factorysight-remote/src/server")
@@ -73,6 +74,51 @@ function createWindow(url: string) {
     return { action: "deny" }
   })
   void mainWindow.loadURL(url)
+}
+
+function createStartupErrorWindow(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error)
+  mainWindow = new BrowserWindow({
+    width: 760,
+    height: 520,
+    minWidth: 640,
+    minHeight: 420,
+    title: "FactorySight Remote",
+    backgroundColor: "#0b0b0c",
+    autoHideMenuBar: true,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  })
+  const body = encodeURIComponent(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>FactorySight Remote</title>
+        <style>
+          :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+          body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0b0b0c; color: #f4f4f5; }
+          main { width: min(560px, calc(100vw - 48px)); border: 1px solid #27272a; border-radius: 14px; padding: 28px; background: #111113; box-shadow: 0 24px 80px rgba(0,0,0,.45); }
+          h1 { margin: 0 0 12px; font-size: 24px; letter-spacing: 0; }
+          p { margin: 0 0 18px; color: #a1a1aa; line-height: 1.55; }
+          pre { white-space: pre-wrap; padding: 14px; border-radius: 10px; background: #18181b; border: 1px solid #27272a; color: #fca5a5; }
+          button { min-height: 40px; border-radius: 9px; border: 1px solid #3f3f46; background: #18181b; color: #f4f4f5; padding: 0 14px; font-weight: 700; }
+        </style>
+      </head>
+      <body>
+        <main>
+          <h1>FactorySight Remote could not start</h1>
+          <p>The desktop shell could not start its local gateway. Restart the app after checking the FactorySight installation.</p>
+          <pre>${message.replaceAll("<", "&lt;")}</pre>
+          <button onclick="window.close()">Quit</button>
+        </main>
+      </body>
+    </html>
+  `)
+  void mainWindow.loadURL(`data:text/html;charset=utf-8,${body}`)
 }
 
 function createMenu() {
@@ -149,5 +195,5 @@ app
   })
   .catch((error) => {
     console.error("FactorySight Remote desktop failed to start", error)
-    app.exit(1)
+    createStartupErrorWindow(error)
   })

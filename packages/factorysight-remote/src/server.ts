@@ -22,10 +22,9 @@ import {
   visibleProjects,
   visibleTasks,
 } from "./store"
-import { enqueueTask, enqueueTaskChain } from "./runner"
+import { backendModels, enqueueBackendTask, enqueueBackendTaskChain, remoteBackendMode } from "./backend"
 import { childPrompt, orchestrationPlan } from "./orchestration"
 import { agentProfiles, defaultAgents, permissionProfiles, type Artifact, type Project, type Task, type User } from "./shared"
-import { availableModels } from "./models"
 import { listProjectFiles, saveUploadedFile } from "./file-storage"
 
 export const app = new Hono<{ Variables: { user: User } }>()
@@ -248,7 +247,8 @@ app.get("/api/app/bootstrap", async (c) => {
     files: (await Promise.all((await visibleProjects(user.id)).map((project) => listProjectFiles(project.path)))).flat(),
     agents: defaultAgents,
     agentProfiles,
-    models: await availableModels(),
+    models: await backendModels(),
+    backendMode: remoteBackendMode(),
     permissionProfiles,
   })
 })
@@ -394,7 +394,7 @@ app.post("/api/tasks", async (c) => {
   if (!project) return c.json({ error: "project not found" }, 404)
   let task = await createTask({ ...body, creatorId: user.id })
   task = await attachFiles(project, task, files, user.id)
-  enqueueTask(task)
+  enqueueBackendTask(task)
   return c.json(task)
 })
 
@@ -446,7 +446,7 @@ app.post("/api/orchestrations", async (c) => {
     type: "system",
     text: `Orchestrator created ${children.length} ordered steps. Running the main plan step before dispatching specialist work.`,
   })
-  enqueueTaskChain(parent.id, children)
+  enqueueBackendTaskChain(parent.id, children)
   return c.json({ ...parent, childTaskIds: children.map((child) => child.id) })
 })
 

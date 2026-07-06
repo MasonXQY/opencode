@@ -366,6 +366,7 @@ function Workspace(props: {
             <Show when={freshestTask()}>
               {(task) => <small>Last update: {task().title}</small>}
             </Show>
+            <small>Backend: {props.data.backendMode === "factorysight" ? "FactorySight" : "Local dev"}</small>
           </div>
         </div>
         <div class="topbar-actions">

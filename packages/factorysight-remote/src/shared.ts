@@ -153,6 +153,7 @@ export type BootstrapData = {
   agents: string[]
   agentProfiles: Record<string, AgentProfile>
   models: string[]
+  backendMode?: "local" | "factorysight"
   permissionProfiles: PermissionProfile[]
 }
 
