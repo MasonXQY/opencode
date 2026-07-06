@@ -324,6 +324,10 @@ function artifactUrl(projectId: string, relativePath: string, token: string | un
   return `/api/projects/${encodeURIComponent(projectId)}/artifacts/${encoded}${suffix}`
 }
 
+function openInNewWindow(url: string) {
+  window.open(url, "_blank", "noopener,noreferrer")
+}
+
 function filePreviewMedia(file: FileAttachment): FlowPreview["media"] | undefined {
   if (file.type.startsWith("image/")) return "image"
   if (file.type === "text/html") return "html"
@@ -812,7 +816,7 @@ function ToolLibrary(props: {
               <button
                 class="artifact-row"
                 onClick={() => {
-                  window.location.href = artifactUrl(artifact.projectId, artifact.relativePath, props.api.getToken())
+                  openInNewWindow(artifactUrl(artifact.projectId, artifact.relativePath, props.api.getToken()))
                 }}
               >
                 <strong>{artifact.name}</strong>
@@ -1167,7 +1171,14 @@ function FlowNodeCard(props: {
         <div class="flow-previews">
           <For each={props.node.previews}>
             {(preview) => (
-              <div class={`flow-preview ${preview.kind}`}>
+              <button
+                type="button"
+                class={`flow-preview ${preview.kind}`}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  openInNewWindow(preview.href)
+                }}
+              >
                 <div class="flow-preview-thumb">
                   <Show
                     when={preview.media === "image"}
@@ -1187,7 +1198,7 @@ function FlowNodeCard(props: {
                   <strong>{preview.title}</strong>
                   <small>{preview.subtitle}</small>
                 </div>
-              </div>
+              </button>
             )}
           </For>
         </div>
@@ -1408,11 +1419,7 @@ function NodeInspector(props: {
                   <button
                     class="artifact-row"
                     onClick={() =>
-                      (window.location.href = artifactUrl(
-                        artifact.projectId,
-                        artifact.relativePath,
-                        props.api.getToken(),
-                      ))
+                      openInNewWindow(artifactUrl(artifact.projectId, artifact.relativePath, props.api.getToken()))
                     }
                   >
                     <strong>{artifact.name}</strong>
