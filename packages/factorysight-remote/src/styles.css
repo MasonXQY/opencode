@@ -304,6 +304,7 @@ body {
 :root[data-theme="linear"] .task-card,
 :root[data-theme="linear"] .mode-cards button,
 :root[data-theme="linear"] .scale-row button,
+:root[data-theme="linear"] .agent-stage,
 :root[data-theme="linear"] .swarm-agent,
 :root[data-theme="linear"] .agent-result,
 :root[data-theme="linear"] .deliverable-card,
@@ -2212,8 +2213,14 @@ h3 {
 }
 
 :root[data-theme="linear"] .detail-header,
+:root[data-theme="linear"] .task-list-summary span,
+:root[data-theme="linear"] .task-empty,
+:root[data-theme="linear"] .context-note,
+:root[data-theme="linear"] .manager-stats span,
+:root[data-theme="linear"] .manager-controls,
 :root[data-theme="linear"] .workspace-summary span,
 :root[data-theme="linear"] .artifact-link,
+:root[data-theme="linear"] .result-metric,
 :root[data-theme="linear"] .result-summary pre,
 :root[data-theme="linear"] .result-errors pre,
 :root[data-theme="linear"] .runner-preview pre,
@@ -2221,6 +2228,108 @@ h3 {
 :root[data-theme="linear"] .event pre {
   background: var(--factory-surface);
   border-color: var(--presight-color-gray-200);
+}
+
+:root[data-theme="linear"] .workspace-summary span.attention,
+:root[data-theme="linear"] .manager-error,
+:root[data-theme="linear"] .result-errors pre,
+:root[data-theme="linear"] .event.event-error {
+  border-color: color-mix(in srgb, var(--presight-color-error-700) 48%, var(--presight-color-gray-200));
+  background: color-mix(in srgb, var(--presight-color-error-700) 18%, var(--factory-surface));
+  color: var(--presight-color-error-700);
+}
+
+:root[data-theme="linear"] .manager-confirm {
+  border-color: color-mix(in srgb, var(--presight-color-warning-700) 42%, var(--presight-color-gray-200));
+  background: color-mix(in srgb, var(--presight-color-warning-700) 16%, var(--factory-surface));
+}
+
+:root[data-theme="linear"] .result-metric.status-running {
+  border-color: color-mix(in srgb, var(--presight-color-blue-500) 38%, var(--presight-color-gray-200));
+  background: color-mix(in srgb, var(--presight-color-blue-500) 16%, var(--factory-surface));
+}
+
+:root[data-theme="linear"] .result-metric.status-completed {
+  border-color: color-mix(in srgb, var(--presight-color-success-700) 38%, var(--presight-color-gray-200));
+  background: color-mix(in srgb, var(--presight-color-success-700) 16%, var(--factory-surface));
+}
+
+:root[data-theme="linear"] .result-metric.status-failed,
+:root[data-theme="linear"] .result-metric.danger {
+  border-color: color-mix(in srgb, var(--presight-color-error-700) 48%, var(--presight-color-gray-200));
+  background: color-mix(in srgb, var(--presight-color-error-700) 20%, var(--factory-surface));
+}
+
+:root[data-theme="linear"] .status {
+  background: color-mix(in srgb, var(--presight-color-gray-300) 14%, var(--factory-surface));
+  color: var(--presight-color-gray-700);
+}
+
+:root[data-theme="linear"] .status.running {
+  background: color-mix(in srgb, var(--presight-color-blue-500) 18%, var(--factory-surface));
+  color: var(--presight-color-blue-700);
+}
+
+:root[data-theme="linear"] .status.completed {
+  background: color-mix(in srgb, var(--presight-color-success-700) 18%, var(--factory-surface));
+  color: var(--presight-color-success-700);
+}
+
+:root[data-theme="linear"] .status.failed {
+  background: color-mix(in srgb, var(--presight-color-error-700) 20%, var(--factory-surface));
+  color: var(--presight-color-error-700);
+}
+
+:root[data-theme="linear"] .status.queued {
+  background: color-mix(in srgb, var(--presight-color-warning-700) 20%, var(--factory-surface));
+  color: var(--presight-color-warning-700);
+}
+
+:root[data-theme="linear"] .chain-index {
+  background: color-mix(in srgb, var(--presight-color-gray-300) 14%, var(--factory-surface));
+  color: var(--presight-color-gray-700);
+}
+
+:root[data-theme="linear"] .chain-index.running {
+  background: color-mix(in srgb, var(--presight-color-blue-500) 18%, var(--factory-surface));
+  color: var(--presight-color-blue-700);
+}
+
+:root[data-theme="linear"] .chain-index.completed {
+  background: color-mix(in srgb, var(--presight-color-success-700) 18%, var(--factory-surface));
+  color: var(--presight-color-success-700);
+}
+
+:root[data-theme="linear"] .chain-index.failed {
+  background: color-mix(in srgb, var(--presight-color-error-700) 20%, var(--factory-surface));
+  color: var(--presight-color-error-700);
+}
+
+:root[data-theme="linear"] .task-list-summary span,
+:root[data-theme="linear"] .task-card small,
+:root[data-theme="linear"] .task-assignee > span,
+:root[data-theme="linear"] .agent-stage p,
+:root[data-theme="linear"] .agent-identity small,
+:root[data-theme="linear"] .swarm-agent-body small,
+:root[data-theme="linear"] .agent-result small,
+:root[data-theme="linear"] .result-metric span,
+:root[data-theme="linear"] .result-empty,
+:root[data-theme="linear"] .artifact-link small,
+:root[data-theme="linear"] .chain-step small,
+:root[data-theme="linear"] .manager-confirm p,
+:root[data-theme="linear"] .manager-projects small,
+:root[data-theme="linear"] .manager-task-row small,
+:root[data-theme="linear"] .workspace-summary small {
+  color: var(--presight-color-gray-500);
+}
+
+:root[data-theme="linear"] .task-card-top strong,
+:root[data-theme="linear"] .task-empty strong,
+:root[data-theme="linear"] .result-metric strong,
+:root[data-theme="linear"] .agent-identity strong,
+:root[data-theme="linear"] .artifact-link strong,
+:root[data-theme="linear"] .workspace-summary strong {
+  color: var(--presight-color-gray-900);
 }
 
 @media (max-width: 980px) {
