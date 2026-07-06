@@ -2,7 +2,7 @@ import { Hono } from "hono"
 import { cors } from "hono/cors"
 import { z } from "zod"
 import path from "node:path"
-import { readFile, readdir } from "node:fs/promises"
+import { readFile } from "node:fs/promises"
 import { fileURLToPath } from "node:url"
 import {
   appendEvent,
@@ -34,6 +34,7 @@ import {
   type User,
 } from "./shared"
 import { listProjectFiles, saveUploadedFile } from "./file-storage"
+import { listProjectArtifacts, writeTaskDeliverableArtifact } from "./artifact-storage"
 
 export const app = new Hono<{ Variables: { user: User } }>()
 const sourceDir =
@@ -217,44 +218,18 @@ async function attachFiles(project: Project, task: Task, files: File[], userId: 
   return { ...task, fileIds: saved.map((file) => file.id) }
 }
 
-async function artifactFiles(project: Project): Promise<Artifact[]> {
-  const root = path.join(project.path, "artifacts")
-  const rootResolved = path.resolve(root)
-  const out: Artifact[] = []
-
-  async function walk(dir: string, depth: number) {
-    if (depth > 4) return
-    let entries: { name: string; isDirectory: () => boolean }[] = []
-    try {
-      entries = await readdir(dir, { withFileTypes: true })
-    } catch {
-      return
-    }
-
-    for (const entry of entries) {
-      const full = path.resolve(dir, entry.name)
-      if (!full.startsWith(rootResolved)) continue
-      if (entry.isDirectory()) {
-        await walk(full, depth + 1)
-        continue
-      }
-      if (!entry.name.endsWith(".html")) continue
-      const relativePath = path.relative(rootResolved, full)
-      out.push({
-        projectId: project.id,
-        name: relativePath.replace(/\/index\.html$/i, "").replace(/\.html$/i, "") || "artifact",
-        relativePath,
-      })
-    }
-  }
-
-  await walk(rootResolved, 0)
-  return out.sort((a, b) => a.relativePath.localeCompare(b.relativePath))
-}
-
 async function visibleArtifacts(userId: string) {
   const projects = await visibleProjects(userId)
-  const nested = await Promise.all(projects.map((project) => artifactFiles(project)))
+  const tasks = await visibleTasks(userId)
+  await Promise.all(
+    tasks.map(async (task) => {
+      const deliverable = task.events.filter((event) => event.type === "deliverable").at(-1)
+      const project = projects.find((item) => item.id === task.projectId)
+      if (!project || !deliverable) return
+      await writeTaskDeliverableArtifact(task, project.path, deliverable.text).catch(() => {})
+    }),
+  )
+  const nested = await Promise.all(projects.map((project) => listProjectArtifacts(project)))
   return nested.flat()
 }
 

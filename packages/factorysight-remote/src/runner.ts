@@ -4,6 +4,7 @@ import { appendEvent, getState, patchTask, setTaskStatus } from "./store"
 import type { Task } from "./shared"
 import { listProjectFiles } from "./file-storage"
 import { runnerAgentFor } from "./agent-routing"
+import { writeTaskDeliverableArtifact } from "./artifact-storage"
 
 const running = new Set<string>()
 
@@ -71,18 +72,20 @@ async function gitStatus(projectPath: string) {
 
 export async function appendDeliverable(task: Task, projectPath: string, exitCode: number) {
   const files = await gitStatus(projectPath)
+  const text = [
+    "Final deliverable",
+    "",
+    `- Agent: ${task.agent}`,
+    `- Model: ${task.model}`,
+    `- Result: ${exitCode === 0 ? "completed" : `failed with exit code ${exitCode}`}`,
+    "",
+    "Files changed:",
+    files,
+  ].join("\n")
+  await writeTaskDeliverableArtifact(task, projectPath, text)
   await appendEvent(task.id, {
     type: "deliverable",
-    text: [
-      "Final deliverable",
-      "",
-      `- Agent: ${task.agent}`,
-      `- Model: ${task.model}`,
-      `- Result: ${exitCode === 0 ? "completed" : `failed with exit code ${exitCode}`}`,
-      "",
-      "Files changed:",
-      files,
-    ].join("\n"),
+    text,
   })
 }
 
@@ -144,18 +147,18 @@ export async function runTask(taskId: string) {
     const prompt = await attachedFileContext(task, project.path)
 
     const args = [
-        bin,
-        "run",
-        prompt,
-        "--format",
-        "json",
-        "--agent",
-        runnerAgent,
-        "--model",
-        task.model,
-        "--dir",
-        project.path,
-      ]
+      bin,
+      "run",
+      prompt,
+      "--format",
+      "json",
+      "--agent",
+      runnerAgent,
+      "--model",
+      task.model,
+      "--dir",
+      project.path,
+    ]
     if (project.permissionLevel === "full_auto") args.push("--auto")
     await appendEvent(taskId, {
       type: "system",
