@@ -233,6 +233,8 @@ label {
 
 .top-brand strong,
 .top-brand span,
+.agent-card strong,
+.agent-card small,
 .project-row strong,
 .project-row small,
 .task-row strong,
@@ -299,7 +301,7 @@ label {
 .fs-stage {
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(252px, 292px) minmax(0, 1fr) minmax(300px, 360px);
+  grid-template-columns: minmax(286px, 320px) minmax(0, 1fr) minmax(326px, 370px);
   overflow: hidden;
 }
 
@@ -424,7 +426,7 @@ label {
 }
 
 .agent-grid {
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
 }
 
 .agent-card,
@@ -445,9 +447,25 @@ label {
 }
 
 .agent-card {
-  grid-template-columns: 34px minmax(0, 1fr);
+  grid-template-columns: 36px minmax(0, 1fr);
   align-items: center;
-  min-height: 66px;
+  min-height: 64px;
+}
+
+.agent-card div:last-child {
+  display: grid;
+  gap: 1px;
+}
+
+.agent-card strong {
+  min-width: 0;
+  font-size: 13px;
+  line-height: 17px;
+}
+
+.agent-card small {
+  min-width: 0;
+  display: block;
 }
 
 .agent-card small,
@@ -468,7 +486,7 @@ label {
 
 .agent-avatar {
   --agent-color: #b8b8b6;
-  width: 34px;
+  width: 36px;
   aspect-ratio: 1;
   display: grid;
   place-items: center;
@@ -562,9 +580,9 @@ label {
   min-height: 0;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
-  gap: 18px;
+  gap: 14px;
   overflow: hidden;
-  padding: 24px;
+  padding: 24px 24px 18px;
   background: var(--canvas);
 }
 
@@ -587,7 +605,7 @@ label {
 }
 
 .workflow-header {
-  padding: 12px 14px;
+  padding: 12px 14px 12px 18px;
   border: 1px solid rgb(255 255 255 / 0.78);
   border-radius: 999px;
   background: rgb(255 255 255 / 0.6);
@@ -628,7 +646,7 @@ label {
 .canvas-progress {
   display: grid;
   gap: 7px;
-  width: min(420px, 70%);
+  width: min(420px, 58%);
   margin-left: auto;
   color: var(--muted);
   font-size: 12px;
@@ -654,22 +672,23 @@ label {
   min-height: 0;
   display: flex;
   align-items: center;
-  gap: 58px;
+  gap: 46px;
   overflow: auto;
-  padding: 50px 34px 80px;
+  padding: 30px 86px 54px 28px;
+  scroll-padding-inline: 28px 86px;
 }
 
 .workflow-node {
   position: relative;
-  flex: 0 0 190px;
-  min-height: 184px;
+  flex: 0 0 176px;
+  min-height: 168px;
   display: grid;
   justify-items: center;
   align-content: center;
-  gap: 10px;
-  padding: 16px;
+  gap: 9px;
+  padding: 15px;
   border: 1px solid rgb(255 255 255 / 0.82);
-  border-radius: 30px;
+  border-radius: 26px;
   background: rgb(255 255 255 / 0.58);
   color: var(--text);
   text-align: center;
@@ -681,9 +700,9 @@ label {
 .workflow-node:not(:last-child)::after {
   content: "";
   position: absolute;
-  top: 78px;
-  left: calc(100% + 14px);
-  width: 34px;
+  top: 74px;
+  left: calc(100% + 10px);
+  width: 30px;
   height: 2px;
   background: rgb(28 28 30 / 0.18);
 }
@@ -691,8 +710,8 @@ label {
 .workflow-node:not(:last-child)::before {
   content: "";
   position: absolute;
-  top: 72px;
-  left: calc(100% + 42px);
+  top: 68px;
+  left: calc(100% + 34px);
   width: 12px;
   height: 12px;
   border-top: 2px solid rgb(28 28 30 / 0.18);
@@ -704,8 +723,8 @@ label {
   border-color: rgb(17 17 17 / 0.36);
   background: white;
   box-shadow:
-    0 0 0 6px rgb(17 17 17 / 0.06),
-    0 24px 70px rgb(28 28 30 / 0.14);
+    0 0 0 5px rgb(17 17 17 / 0.06),
+    0 20px 58px rgb(28 28 30 / 0.13);
 }
 
 .workflow-node.failed {
@@ -727,16 +746,45 @@ label {
   font-weight: 900;
 }
 
+.workflow-node .agent-card {
+  min-height: 48px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.workflow-node .agent-avatar {
+  width: 34px;
+  border-color: rgb(28 28 30 / 0.06);
+}
+
+.workflow-node .agent-card strong {
+  font-size: 13px;
+  line-height: 16px;
+}
+
+.workflow-node .agent-card small {
+  font-size: 11px;
+  line-height: 14px;
+}
+
 .workflow-node > strong {
   max-width: 100%;
   overflow: hidden;
+  display: -webkit-box;
+  min-height: 34px;
+  font-size: 13px;
+  line-height: 17px;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .workflow-node > small {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
+  line-height: 15px;
 }
 
 .canvas-empty {
@@ -773,7 +821,7 @@ label {
 }
 
 .inspector-card.hero {
-  gap: 14px;
+  gap: 13px;
 }
 
 .inspector-card h2 {
@@ -851,7 +899,7 @@ label {
 }
 
 .output-preview {
-  max-height: 240px;
+  max-height: 210px;
   overflow: auto;
   margin: 0;
   padding: 12px;
@@ -910,7 +958,7 @@ label {
 
 .mission-bar form {
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(360px, 0.9fr);
+  grid-template-columns: minmax(520px, 1fr) minmax(650px, 0.95fr);
   gap: 12px;
   padding: 10px;
   border: 1px solid rgb(255 255 255 / 0.82);
@@ -923,7 +971,7 @@ label {
 .mission-input {
   min-width: 0;
   display: grid;
-  grid-template-columns: auto minmax(0, 240px) minmax(260px, 1fr);
+  grid-template-columns: auto minmax(160px, 220px) minmax(280px, 1fr);
   gap: 8px;
   align-items: center;
 }
@@ -939,16 +987,30 @@ label {
 }
 
 .mission-input textarea {
-  min-height: 44px;
+  min-height: 42px;
   max-height: 120px;
 }
 
 .mission-options {
   min-width: 0;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) auto auto;
+  grid-template-columns:
+    minmax(104px, 0.76fr)
+    minmax(104px, 0.76fr)
+    minmax(188px, 1.35fr)
+    minmax(126px, 0.9fr)
+    minmax(136px, 1fr)
+    auto
+    auto;
   gap: 8px;
   align-items: center;
+}
+
+.mission-options select,
+.mission-options input,
+.mission-options button,
+.attach-control {
+  min-height: 40px;
 }
 
 .attach-control {
@@ -981,7 +1043,7 @@ label {
   }
 
   .fs-stage {
-    grid-template-columns: minmax(236px, 280px) minmax(0, 1fr);
+    grid-template-columns: minmax(270px, 300px) minmax(0, 1fr);
   }
 
   .inspector {
