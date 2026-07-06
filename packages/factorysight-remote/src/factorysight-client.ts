@@ -7,6 +7,25 @@ import { availableModels as factorySightCliModels } from "./models"
 import { attachedFileContext, appendDeliverable, runTask as runFactorySightCliTask } from "./runner"
 import { runnerAgentFor } from "./agent-routing"
 
+type FactorySightSession = {
+  id: string
+  projectID?: string
+  agent?: string
+  model?: {
+    providerID?: string
+    id?: string
+  }
+  title?: string
+  location?: {
+    directory?: string
+  }
+  time?: {
+    created?: number
+    updated?: number
+    archived?: number
+  }
+}
+
 function binaryPath() {
   return (
     process.env.FACTORYSIGHT_BIN ??
@@ -23,7 +42,8 @@ export function modelRefFromString(model: string) {
 }
 
 export function modelsFromFactorySightResponse(response: unknown) {
-  const data = typeof response === "object" && response && "data" in response ? (response as { data?: unknown }).data : response
+  const data =
+    typeof response === "object" && response && "data" in response ? (response as { data?: unknown }).data : response
   if (!Array.isArray(data)) return defaultModels
   const models = data
     .filter((item): item is { providerID: string; id: string; enabled?: boolean } => {
@@ -99,6 +119,78 @@ export async function factorySightModels() {
     return modelsFromFactorySightResponse(await factorySightApi("GET", "/api/model"))
   } catch {
     return factorySightCliModels().catch(() => defaultModels)
+  }
+}
+
+function modelFromFactorySightSession(session: FactorySightSession) {
+  const providerID = session.model?.providerID
+  const id = session.model?.id
+  if (providerID && id) return `${providerID}/${id}`
+  return preferredDefaultModel
+}
+
+function isoFromMillis(value: number | undefined) {
+  return new Date(value ?? Date.now()).toISOString()
+}
+
+export function factorySightSessionToTask(session: FactorySightSession, userId: string, projectId?: string): Task {
+  const at = isoFromMillis(session.time?.updated ?? session.time?.created)
+  const taskId = `fs_${session.id}`
+  return {
+    id: taskId,
+    projectId: projectId ?? `fs_${session.projectID ?? "default"}`,
+    creatorId: userId,
+    kind: "single",
+    title: session.title?.trim() || `FactorySight session ${session.id}`,
+    prompt: `FactorySight session ${session.id}`,
+    agent: session.agent?.trim() || "build",
+    model: modelFromFactorySightSession(session),
+    status: session.time?.archived ? "archived" : "completed",
+    collaboration: "project",
+    createdAt: isoFromMillis(session.time?.created),
+    updatedAt: at,
+    sessionId: session.id,
+    events: [
+      {
+        id: `evt_${taskId}_session`,
+        taskId,
+        at,
+        type: "system",
+        text: [
+          `FactorySight session: ${session.id}`,
+          session.location?.directory ? `Workspace: ${session.location.directory}` : undefined,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      },
+    ],
+  }
+}
+
+function sessionsFromFactorySightResponse(response: unknown) {
+  const data =
+    typeof response === "object" && response && "data" in response ? (response as { data?: unknown }).data : response
+  if (!Array.isArray(data)) return []
+  return data.filter((item): item is FactorySightSession => {
+    if (!item || typeof item !== "object") return false
+    return typeof (item as { id?: unknown }).id === "string"
+  })
+}
+
+export async function factorySightTasksForProjects(userId: string, projects: Project[]) {
+  try {
+    const response = await factorySightApi("GET", "/api/session?limit=100")
+    return sessionsFromFactorySightResponse(response)
+      .map((session) => {
+        const project = projects.find(
+          (item) => session.location?.directory && path.resolve(item.path) === path.resolve(session.location.directory),
+        )
+        if (!project) return
+        return factorySightSessionToTask(session, userId, project.id)
+      })
+      .filter((task): task is Task => Boolean(task))
+  } catch {
+    return []
   }
 }
 

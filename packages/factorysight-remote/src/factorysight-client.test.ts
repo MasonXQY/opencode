@@ -1,5 +1,11 @@
 import { expect, test } from "bun:test"
-import { factorySightApiArgs, factorySightApiUrl, modelRefFromString, modelsFromFactorySightResponse } from "./factorysight-client"
+import {
+  factorySightApiArgs,
+  factorySightApiUrl,
+  factorySightSessionToTask,
+  modelRefFromString,
+  modelsFromFactorySightResponse,
+} from "./factorysight-client"
 
 test("modelRefFromString converts remote model strings into FactorySight model refs", () => {
   expect(modelRefFromString("anthropic/claude-opus-4-8")).toEqual({
@@ -40,4 +46,30 @@ test("factorySightApiArgs builds raw FactorySight API commands", () => {
 test("factorySightApiUrl resolves API paths against a FactorySight backend URL", () => {
   expect(factorySightApiUrl("http://127.0.0.1:4096", "/api/model")).toBe("http://127.0.0.1:4096/api/model")
   expect(factorySightApiUrl("http://127.0.0.1:4096/", "/api/session")).toBe("http://127.0.0.1:4096/api/session")
+})
+
+test("factorySightSessionToTask maps FactorySight sessions to Remote task cards", () => {
+  expect(
+    factorySightSessionToTask(
+      {
+        id: "ses_123",
+        projectID: "prj_backend",
+        agent: "build",
+        model: { providerID: "anthropic", id: "claude-opus-4-8" },
+        title: "Implement login",
+        time: { created: 1783348196848, updated: 1783348459715 },
+        location: { directory: "/tmp/app" },
+      },
+      "usr_mason",
+    ),
+  ).toMatchObject({
+    id: "fs_ses_123",
+    projectId: "fs_prj_backend",
+    creatorId: "usr_mason",
+    title: "Implement login",
+    agent: "build",
+    model: "anthropic/claude-opus-4-8",
+    status: "completed",
+    sessionId: "ses_123",
+  })
 })

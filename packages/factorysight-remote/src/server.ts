@@ -22,14 +22,25 @@ import {
   visibleProjects,
   visibleTasks,
 } from "./store"
-import { backendModels, enqueueBackendTask, enqueueBackendTaskChain, remoteBackendMode } from "./backend"
+import { backendModels, backendTasks, enqueueBackendTask, enqueueBackendTaskChain, remoteBackendMode } from "./backend"
 import { childPrompt, orchestrationPlan } from "./orchestration"
-import { agentProfiles, defaultAgents, permissionProfiles, type Artifact, type Project, type Task, type User } from "./shared"
+import {
+  agentProfiles,
+  defaultAgents,
+  permissionProfiles,
+  type Artifact,
+  type Project,
+  type Task,
+  type User,
+} from "./shared"
 import { listProjectFiles, saveUploadedFile } from "./file-storage"
 
 export const app = new Hono<{ Variables: { user: User } }>()
-const sourceDir = typeof import.meta.dirname === "string" ? import.meta.dirname : path.dirname(new URL(import.meta.url).pathname)
-const clientDir = path.resolve(process.env.FACTORYSIGHT_REMOTE_CLIENT_DIR ?? path.resolve(sourceDir, "..", "dist", "client"))
+const sourceDir =
+  typeof import.meta.dirname === "string" ? import.meta.dirname : path.dirname(new URL(import.meta.url).pathname)
+const clientDir = path.resolve(
+  process.env.FACTORYSIGHT_REMOTE_CLIENT_DIR ?? path.resolve(sourceDir, "..", "dist", "client"),
+)
 
 const loginSchema = z.object({ email: z.string().email() })
 const createProjectSchema = z.object({
@@ -132,6 +143,18 @@ function assertUploadLimits(files: File[]) {
 
 async function visibleProject(projectId: string, userId: string) {
   return (await visibleProjects(userId)).find((item) => item.id === projectId)
+}
+
+async function visibleBackendTasks(userId: string) {
+  const projects = await visibleProjects(userId)
+  return backendTasks(await visibleTasks(userId), projects, userId)
+}
+
+async function getVisibleBackendTask(taskId: string, userId: string) {
+  const localTask = await getVisibleTask(taskId, userId)
+  if (localTask) return localTask
+  if (!taskId.startsWith("fs_")) return
+  return (await visibleBackendTasks(userId)).find((task) => task.id === taskId)
 }
 
 async function parseCreateTask(c: any) {
@@ -238,13 +261,14 @@ async function visibleArtifacts(userId: string) {
 app.get("/api/app/bootstrap", async (c) => {
   const user = c.get("user")
   const state = await getState()
+  const projects = await visibleProjects(user.id)
   return c.json({
     user,
     users: state.users,
-    projects: await visibleProjects(user.id),
-    tasks: await visibleTasks(user.id),
+    projects,
+    tasks: await backendTasks(await visibleTasks(user.id), projects, user.id),
     artifacts: await visibleArtifacts(user.id),
-    files: (await Promise.all((await visibleProjects(user.id)).map((project) => listProjectFiles(project.path)))).flat(),
+    files: (await Promise.all(projects.map((project) => listProjectFiles(project.path)))).flat(),
     agents: defaultAgents,
     agentProfiles,
     models: await backendModels(),
@@ -384,7 +408,7 @@ app.put("/api/projects/:projectId/permission", async (c) => {
 })
 
 app.get("/api/tasks", async (c) => {
-  return c.json(await visibleTasks(c.get("user").id))
+  return c.json(await visibleBackendTasks(c.get("user").id))
 })
 
 app.post("/api/tasks", async (c) => {
@@ -452,7 +476,7 @@ app.post("/api/orchestrations", async (c) => {
 
 app.get("/api/tasks/:taskId/files", async (c) => {
   const user = c.get("user")
-  const task = await getVisibleTask(c.req.param("taskId"), user.id)
+  const task = await getVisibleBackendTask(c.req.param("taskId"), user.id)
   if (!task) return c.json({ error: "task not found" }, 404)
   const project = await visibleProject(task.projectId, user.id)
   if (!project) return c.json({ error: "project not found" }, 404)
@@ -460,7 +484,7 @@ app.get("/api/tasks/:taskId/files", async (c) => {
 })
 
 app.get("/api/tasks/:taskId", async (c) => {
-  const task = await getVisibleTask(c.req.param("taskId"), c.get("user").id)
+  const task = await getVisibleBackendTask(c.req.param("taskId"), c.get("user").id)
   if (!task) return c.json({ error: "task not found" }, 404)
   return c.json(task)
 })
@@ -506,7 +530,7 @@ app.post("/api/tasks/:taskId/share", async (c) => {
 
 app.get("/api/tasks/:taskId/events", async (c) => {
   const user = c.get("user")
-  const task = await getVisibleTask(c.req.param("taskId"), user.id)
+  const task = await getVisibleBackendTask(c.req.param("taskId"), user.id)
   if (!task) return c.json({ error: "task not found" }, 404)
 
   const stream = new ReadableStream({
@@ -516,6 +540,10 @@ app.get("/api/tasks/:taskId/events", async (c) => {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
       }
       for (const event of task.events) send(event)
+      if (task.id.startsWith("fs_")) {
+        controller.close()
+        return
+      }
       const unsubscribe = subscribe(task.id, send)
       const interval = setInterval(() => {
         controller.enqueue(encoder.encode(`: keepalive\n\n`))
@@ -562,7 +590,9 @@ app.get("*", async (c) => {
   const filePath = requestPath === "/" ? path.join(clientDir, "index.html") : path.join(clientDir, requestPath)
   const response = await staticResponse(filePath)
   if (response) return response
-  return (await staticResponse(path.join(clientDir, "index.html"))) ?? c.text("FactorySight Remote is not built yet.", 503)
+  return (
+    (await staticResponse(path.join(clientDir, "index.html"))) ?? c.text("FactorySight Remote is not built yet.", 503)
+  )
 })
 
 const port = Number(process.env.PORT ?? process.env.FACTORYSIGHT_REMOTE_PORT ?? 3090)
