@@ -24,10 +24,30 @@ import "./styles.css"
 
 const tokenKey = "factorysight.remote.token"
 
-type LibraryTab = "agents" | "projects" | "files" | "artifacts"
+type LibraryTab = "projects" | "files" | "artifacts" | "agents"
 type ComposeMode = "swarm" | "direct"
 type Scale = "focused" | "balanced" | "wide"
 type WorkspaceView = "workflow" | "cli"
+type FlowNodeKind = "input" | "planner" | "agent" | "artifact" | "placeholder"
+type FlowNode = {
+  id: string
+  kind: FlowNodeKind
+  x: number
+  y: number
+  title: string
+  subtitle: string
+  status?: Task["status"]
+  agent?: string
+  taskId?: string
+  meta?: string
+}
+type FlowEdge = {
+  id: string
+  from: FlowNode
+  to: FlowNode
+  label: string
+  loop?: boolean
+}
 type SpeechRecognitionResultLike = {
   isFinal: boolean
   0: { transcript: string }
@@ -112,6 +132,114 @@ function taskCounts(tasks: Task[]) {
 function progressValue(tasks: Task[]) {
   if (!tasks.length) return 0
   return Math.round((tasks.filter((task) => task.status === "completed").length / tasks.length) * 100)
+}
+
+function buildProjectFlow(input: {
+  project: Project | undefined
+  tasks: Task[]
+  chainTasks: Task[]
+  artifacts: Artifact[]
+  files: FileAttachment[]
+  selectedTaskId: string | undefined
+}) {
+  const runs = (input.chainTasks.length ? input.chainTasks : input.tasks.slice(0, 8)).filter(
+    (task, index, all) => all.findIndex((item) => item.id === task.id) === index,
+  )
+  const nodes: FlowNode[] = []
+  const inputNode: FlowNode = {
+    id: "flow-input",
+    kind: "input",
+    x: 80,
+    y: 230,
+    title: "Project requirement",
+    subtitle: input.project ? "Text, voice, and attached files" : "Create a project first",
+    meta: input.files.length
+      ? `${input.files.length} file${input.files.length === 1 ? "" : "s"} attached`
+      : "No files attached",
+  }
+  nodes.push(inputNode)
+
+  if (!runs.length) {
+    nodes.push({
+      id: "flow-placeholder",
+      kind: "placeholder",
+      x: 410,
+      y: 230,
+      title: "Flow will be generated",
+      subtitle: "FactorySight analyzes the requirement and creates a topology.",
+      meta: "Tree, branch, or loop",
+    })
+  } else {
+    const root = runs.at(0)!
+    nodes.push({
+      id: root.id,
+      taskId: root.id,
+      kind: root.kind === "orchestration" ? "planner" : "agent",
+      x: 390,
+      y: 230,
+      title: root.kind === "orchestration" ? "Primary planner" : root.title,
+      subtitle: `${taskStage(root)} · ${root.agent}`,
+      status: root.status,
+      agent: root.agent,
+    })
+    const children = runs.slice(1)
+    const rowGap = children.length > 4 ? 104 : 126
+    const startY = Math.max(70, 230 - ((children.length - 1) * rowGap) / 2)
+    children.forEach((task, index) => {
+      nodes.push({
+        id: task.id,
+        taskId: task.id,
+        kind: "agent",
+        x: 700 + Math.floor(index / 5) * 270,
+        y: startY + (index % 5) * rowGap,
+        title: task.title,
+        subtitle: `${taskStage(task)} · ${task.agent}`,
+        status: task.status,
+        agent: task.agent,
+      })
+    })
+  }
+
+  const outputNode: FlowNode = {
+    id: "flow-output",
+    kind: "artifact",
+    x: runs.length > 6 ? 1260 : 1020,
+    y: 230,
+    title: "Artifact output",
+    subtitle: input.artifacts.length ? "Project deliverables are ready" : "Outputs appear here after the run",
+    meta: input.artifacts.length
+      ? `${input.artifacts.length} artifact${input.artifacts.length === 1 ? "" : "s"}`
+      : "No artifacts yet",
+  }
+  nodes.push(outputNode)
+
+  const byId = new Map(nodes.map((node) => [node.id, node]))
+  const edges: FlowEdge[] = []
+  const firstRunTask = runs.at(0)
+  const firstRun = firstRunTask ? byId.get(firstRunTask.id) : byId.get("flow-placeholder")
+  if (firstRun) edges.push({ id: "edge-input", from: inputNode, to: firstRun, label: "analyze" })
+  if (runs.length > 1) {
+    const rootTask = runs.at(0)
+    const root = rootTask ? byId.get(rootTask.id) : undefined
+    for (const task of runs.slice(1)) {
+      const child = byId.get(task.id)
+      if (root && child)
+        edges.push({ id: `edge-${root.id}-${child.id}`, from: root, to: child, label: taskStage(task) })
+    }
+  }
+  const terminalNodes = runs.length > 1 ? runs.slice(1) : runs
+  for (const task of terminalNodes.filter((item) => ["completed", "failed"].includes(item.status)).slice(-3)) {
+    const node = byId.get(task.id)
+    if (node) edges.push({ id: `edge-${node.id}-output`, from: node, to: outputNode, label: "deliver" })
+  }
+  const failed = runs.find((task) => task.status === "failed")
+  const rootForLoop = runs.at(0)
+  const root = rootForLoop ? byId.get(rootForLoop.id) : undefined
+  const failedNode = failed ? byId.get(failed.id) : undefined
+  if (root && failedNode && root.id !== failedNode.id) {
+    edges.push({ id: `edge-loop-${failedNode.id}`, from: failedNode, to: root, label: "retry loop", loop: true })
+  }
+  return { nodes, edges }
 }
 
 function eventDigest(events: TaskEvent[]) {
@@ -263,7 +391,7 @@ function CanvasWorkspace(props: {
 }) {
   const newestProjectId = createMemo(() => props.data.projects.at(-1)?.id)
   const [activeProjectId, setActiveProjectId] = createSignal(newestProjectId())
-  const [libraryTab, setLibraryTab] = createSignal<LibraryTab>("agents")
+  const [libraryTab, setLibraryTab] = createSignal<LibraryTab>("projects")
   const [workspaceView, setWorkspaceView] = createSignal<WorkspaceView>("workflow")
   const [composerFocusRequest, setComposerFocusRequest] = createSignal(0)
   const activeProject = createMemo(() => props.data.projects.find((project) => project.id === activeProjectId()))
@@ -326,11 +454,8 @@ function CanvasWorkspace(props: {
             setActiveProjectId(id)
             props.onSelectTask(undefined)
           }}
-          selectedTaskId={props.selectedTaskId}
-          tasks={projectTasks()}
           files={activeFiles()}
           artifacts={activeArtifacts()}
-          onSelectTask={props.onSelectTask}
           onRefresh={props.onRefresh}
         />
         <Show
@@ -344,6 +469,8 @@ function CanvasWorkspace(props: {
               selectedTask={selectedTask()}
               selectedTaskId={props.selectedTaskId}
               counts={counts()}
+              artifacts={activeArtifacts()}
+              files={activeFiles()}
               onSelectTask={props.onSelectTask}
               onRefresh={props.onRefresh}
               onStartWorkflow={() => setComposerFocusRequest((value) => value + 1)}
@@ -495,16 +622,13 @@ function ToolLibrary(props: {
   onTab: (tab: LibraryTab) => void
   activeProjectId: string | undefined
   onProject: (id: string) => void
-  selectedTaskId: string | undefined
-  tasks: Task[]
   files: FileAttachment[]
   artifacts: Artifact[]
-  onSelectTask: (id: string) => void
   onRefresh: () => void
 }) {
   const [newProjectOpen, setNewProjectOpen] = createSignal(false)
   const [busyProjectId, setBusyProjectId] = createSignal<string | undefined>()
-  const tabs: LibraryTab[] = ["agents", "projects", "files", "artifacts"]
+  const tabs: LibraryTab[] = ["projects", "files", "artifacts", "agents"]
   return (
     <aside class="tool-library">
       <div class="library-title">
@@ -565,25 +689,6 @@ function ToolLibrary(props: {
         <Panel heading="Agents" meta={`${props.data.agents.length} roles`}>
           <div class="agent-grid">
             <For each={props.data.agents}>{(agent) => <AgentCard data={props.data} agent={agent} />}</For>
-          </div>
-        </Panel>
-        <Panel heading="Tasks" meta={`${props.tasks.length} visible`}>
-          <div class="task-rail">
-            <For each={props.tasks}>
-              {(task) => (
-                <button
-                  class="task-row"
-                  classList={{ active: task.id === props.selectedTaskId }}
-                  onClick={() => props.onSelectTask(task.id)}
-                >
-                  <span class={`status-dot ${task.status}`} />
-                  <strong>{task.title}</strong>
-                  <small>
-                    {taskStage(task)} · {time(task.updatedAt)}
-                  </small>
-                </button>
-              )}
-            </For>
           </div>
         </Panel>
       </Show>
@@ -737,24 +842,35 @@ function WorkflowCanvas(props: {
   selectedTask: Task | undefined
   selectedTaskId: string | undefined
   counts: ReturnType<typeof taskCounts>
+  artifacts: Artifact[]
+  files: FileAttachment[]
   onSelectTask: (id: string) => void
   onRefresh: () => void
   onStartWorkflow: () => void
 }) {
   let nodeViewport: HTMLDivElement | undefined
   const percent = createMemo(() => progressValue(props.chainTasks.length ? props.chainTasks : props.tasks))
-  const visibleTasks = createMemo(() => (props.chainTasks.length ? props.chainTasks : props.tasks.slice(0, 8)))
+  const flow = createMemo(() =>
+    buildProjectFlow({
+      project: props.project,
+      tasks: props.tasks,
+      chainTasks: props.chainTasks,
+      artifacts: props.artifacts,
+      files: props.files,
+      selectedTaskId: props.selectedTaskId,
+    }),
+  )
   const [zoom, setZoom] = createSignal(1)
   const zoomLabel = createMemo(() => `${Math.round(zoom() * 100)}%`)
   const updateZoom = (delta: number) => setZoom((value) => Math.min(1.28, Math.max(0.72, value + delta)))
   const focusSelectedNode = () =>
     requestAnimationFrame(() => {
       nodeViewport
-        ?.querySelector(".workflow-node.selected")
+        ?.querySelector(".flow-node.selected")
         ?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" })
     })
   const fitCanvas = () => {
-    setZoom(visibleTasks().length > 5 ? 0.82 : 0.92)
+    setZoom(flow().nodes.length > 7 ? 0.78 : 0.92)
     requestAnimationFrame(() => nodeViewport?.scrollTo({ left: 0, behavior: "smooth" }))
   }
 
@@ -768,15 +884,19 @@ function WorkflowCanvas(props: {
       <div class="canvas-grid" aria-hidden="true" />
       <div class="workflow-header">
         <div>
-          <span class="eyebrow">Agent workflow</span>
-          <h1>{props.selectedTask?.title ?? props.project?.name ?? "Create a project to start"}</h1>
-          <p>{props.project?.path ?? "FactorySight Remote is ready for a workspace."}</p>
+          <span class="eyebrow">Project workflow</span>
+          <h1>{props.project?.name ?? "Create a project to start"}</h1>
+          <p>
+            {props.selectedTask
+              ? `Current run: ${props.selectedTask.title}`
+              : (props.project?.path ?? "FactorySight Remote is ready for a workspace.")}
+          </p>
         </div>
         <div class="run-controls">
           <button class="secondary" onClick={props.onRefresh}>
             Sync status
           </button>
-          <button onClick={props.onStartWorkflow}>New workflow</button>
+          <button onClick={props.onStartWorkflow}>Add requirement</button>
         </div>
       </div>
       <div class="canvas-toolbar">
@@ -802,32 +922,22 @@ function WorkflowCanvas(props: {
           </button>
         </div>
       </div>
-      <Show when={props.chainTasks.length || props.tasks.length} fallback={<CanvasEmpty />}>
-        <div class="node-viewport" ref={nodeViewport}>
-          <div class="node-flow" style={{ "--canvas-zoom": zoom() }}>
-            <For each={visibleTasks()}>
-              {(task, index) => (
-                <button
-                  class="workflow-node"
-                  classList={{
-                    selected: task.id === props.selectedTaskId,
-                    completed: task.status === "completed",
-                    failed: task.status === "failed",
-                  }}
-                  onClick={() => props.onSelectTask(task.id)}
-                >
-                  <span class={`node-index ${task.status}`}>{index() + 1}</span>
-                  <AgentCard data={props.data} agent={task.agent} />
-                  <strong>{task.kind === "orchestration" ? "Primary planner" : task.title}</strong>
-                  <small>
-                    {taskStage(task)} · {statusLabel(task.status)}
-                  </small>
-                </button>
-              )}
-            </For>
-          </div>
+      <div class="node-viewport" ref={nodeViewport}>
+        <div class="node-flow graph-flow" style={{ "--canvas-zoom": zoom() }}>
+          <FlowEdges edges={flow().edges} />
+          <For each={flow().nodes}>
+            {(node, index) => (
+              <FlowNodeCard
+                data={props.data}
+                node={node}
+                index={index() + 1}
+                selected={node.taskId === props.selectedTaskId}
+                onSelect={() => node.taskId && props.onSelectTask(node.taskId)}
+              />
+            )}
+          </For>
         </div>
-      </Show>
+      </div>
       <div class="canvas-footer">
         <span>{props.counts.running} running</span>
         <span>{props.counts.queued} queued</span>
@@ -842,8 +952,105 @@ function CanvasEmpty() {
   return (
     <div class="canvas-empty">
       <strong>No workflow yet</strong>
-      <span>Describe a mission in the command bar and FactorySight will create the agent chain.</span>
+      <span>Enter a requirement below and FactorySight will create the agent chain for this project.</span>
     </div>
+  )
+}
+
+function FlowEdges(props: { edges: FlowEdge[] }) {
+  const pathFor = (edge: FlowEdge) => {
+    const fromX = edge.from.x + 206
+    const fromY = edge.from.y + 42
+    const toX = edge.to.x
+    const toY = edge.to.y + 42
+    if (edge.loop) {
+      const controlY = Math.min(fromY, toY) - 120
+      return `M ${fromX} ${fromY} C ${fromX + 90} ${controlY}, ${toX - 90} ${controlY}, ${toX} ${toY}`
+    }
+    const middle = Math.max(70, (toX - fromX) / 2)
+    return `M ${fromX} ${fromY} C ${fromX + middle} ${fromY}, ${toX - middle} ${toY}, ${toX} ${toY}`
+  }
+  const labelPoint = (edge: FlowEdge) => ({
+    x: (edge.from.x + edge.to.x) / 2 + 98,
+    y: (edge.from.y + edge.to.y) / 2 + 24,
+  })
+  return (
+    <svg class="flow-edges" viewBox="0 0 1460 620" aria-hidden="true">
+      <defs>
+        <marker id="flow-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" />
+        </marker>
+      </defs>
+      <For each={props.edges}>
+        {(edge) => {
+          const label = labelPoint(edge)
+          return (
+            <g classList={{ "loop-edge": edge.loop }}>
+              <path class="flow-edge-path" d={pathFor(edge)} marker-end="url(#flow-arrow)" />
+              <text class="flow-edge-label" x={label.x} y={label.y}>
+                {edge.label}
+              </text>
+            </g>
+          )
+        }}
+      </For>
+    </svg>
+  )
+}
+
+function FlowNodeCard(props: {
+  data: BootstrapData
+  node: FlowNode
+  index: number
+  selected: boolean
+  onSelect: () => void
+}) {
+  const profile = createMemo(() => (props.node.agent ? props.data.agentProfiles[props.node.agent] : undefined))
+  return (
+    <button
+      type="button"
+      class={`flow-node ${props.node.kind}`}
+      classList={{
+        selected: props.selected,
+        completed: props.node.status === "completed",
+        running: props.node.status === "running",
+        failed: props.node.status === "failed",
+      }}
+      style={{ left: `${props.node.x}px`, top: `${props.node.y}px` }}
+      aria-disabled={!props.node.taskId}
+      onClick={props.onSelect}
+    >
+      <div class="flow-node-top">
+        <span class="flow-node-index">
+          {props.node.kind === "artifact" ? "OUT" : props.node.kind === "input" ? "IN" : props.index}
+        </span>
+        <span class="flow-node-kind">{props.node.kind.replace("-", " ")}</span>
+      </div>
+      <Show
+        when={profile()}
+        fallback={
+          <div class="flow-node-icon">
+            {props.node.kind === "artifact" ? "A" : props.node.kind === "input" ? "I" : "F"}
+          </div>
+        }
+      >
+        {(agent) => (
+          <div class="flow-node-agent">
+            <div class="agent-avatar" style={{ "--agent-color": agent().color }}>
+              {agent().initials}
+            </div>
+            <span>{agent().name}</span>
+          </div>
+        )}
+      </Show>
+      <strong>{props.node.title}</strong>
+      <small>{props.node.subtitle}</small>
+      <Show when={props.node.meta || props.node.status}>
+        <span class={`flow-node-meta ${props.node.status ?? ""}`}>
+          {props.node.meta ?? statusLabel(props.node.status!)}
+        </span>
+      </Show>
+    </button>
   )
 }
 
@@ -865,7 +1072,7 @@ function CliWorkspace(props: {
       selectedDigest().deliverables.at(-1)?.text ??
       selectedDigest().lastOutput ??
       selectedDigest().lastStatus ??
-      "Select a task or launch a new mission to stream CLI-style progress here.",
+      "Enter a requirement below to stream CLI-style project progress here.",
   )
   return (
     <section class="cli-shell">
@@ -882,12 +1089,12 @@ function CliWorkspace(props: {
             <button class="secondary" onClick={props.onRefresh}>
               Sync
             </button>
-            <button onClick={props.onStartWorkflow}>New task</button>
+            <button onClick={props.onStartWorkflow}>Add requirement</button>
           </div>
         </div>
         <div class="cli-thread">
           <div class="cli-separator">
-            <span>{props.selectedTask ? "TASK ACTIVE" : "TASK INITIATED"}</span>
+            <span>{props.selectedTask ? "RUN ACTIVE" : "PROJECT READY"}</span>
           </div>
           <div class="cli-context">
             <button class="cli-context-row" onClick={props.onStartWorkflow}>
@@ -943,8 +1150,8 @@ function CliWorkspace(props: {
 function CliEmpty(props: { onStartWorkflow: () => void }) {
   return (
     <div class="cli-empty">
-      <span>No task stream yet.</span>
-      <button onClick={props.onStartWorkflow}>Start from mission input</button>
+      <span>No project run yet.</span>
+      <button onClick={props.onStartWorkflow}>Start from requirement input</button>
     </div>
   )
 }
@@ -1142,7 +1349,7 @@ function NodeInspector(props: {
 function InspectorEmpty(props: { project: Project | undefined }) {
   return (
     <section class="inspector-card hero">
-      <h2>{props.project ? "Select a node" : "No project selected"}</h2>
+      <h2>{props.project ? "Select a workflow node" : "No project selected"}</h2>
       <p>
         {props.project
           ? "Choose a workflow node to inspect configuration, output, artifacts, and events."
@@ -1291,12 +1498,12 @@ function MissionCommandBar(props: {
         }}
       >
         <div class="mission-input">
-          <span>Mission</span>
+          <span>Requirement</span>
           <textarea
             ref={promptInput}
             value={prompt()}
             onInput={(event) => setPrompt(event.currentTarget.value)}
-            placeholder="Describe the product or engineering outcome. FactorySight will name the task automatically..."
+            placeholder="Describe what this project needs next. FactorySight will plan and run the workflow automatically..."
           />
           <div class="voice-tools">
             <button

@@ -751,6 +751,221 @@ label {
   transition: transform 180ms ease;
 }
 
+.graph-flow {
+  position: relative;
+  width: 1460px;
+  height: 620px;
+  display: block;
+  padding: 0;
+  transform-origin: left top;
+}
+
+.flow-edges {
+  position: absolute;
+  inset: 0;
+  width: 1460px;
+  height: 620px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.flow-edge-path {
+  fill: none;
+  stroke: rgb(24 25 27 / 0.38);
+  stroke-width: 1.4;
+  stroke-dasharray: 4 5;
+}
+
+.flow-edges marker path {
+  fill: rgb(24 25 27 / 0.48);
+}
+
+.loop-edge .flow-edge-path {
+  stroke: rgb(102 87 255 / 0.58);
+  stroke-dasharray: 6 4;
+}
+
+.loop-edge marker path {
+  fill: rgb(102 87 255 / 0.68);
+}
+
+.flow-edge-label {
+  paint-order: stroke;
+  stroke: #fbfbfa;
+  stroke-width: 7px;
+  fill: var(--text);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.flow-node {
+  position: absolute;
+  width: 206px;
+  min-height: 88px;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: 11px 12px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  background: white;
+  color: var(--text);
+  text-align: left;
+  box-shadow: 0 12px 28px rgb(24 25 27 / 0.05);
+}
+
+.flow-node:hover {
+  box-shadow: 0 14px 34px rgb(24 25 27 / 0.09);
+}
+
+.flow-node[aria-disabled="true"] {
+  cursor: default;
+}
+
+.flow-node.selected {
+  border-color: var(--blue);
+  box-shadow:
+    0 0 0 2px rgb(102 87 255 / 0.16),
+    0 16px 38px rgb(24 25 27 / 0.11);
+}
+
+.flow-node.input {
+  border-color: rgb(24 25 27 / 0.2);
+  background: #f2f2f0;
+}
+
+.flow-node.planner {
+  border-color: rgb(24 25 27 / 0.24);
+}
+
+.flow-node.artifact {
+  border-color: rgb(102 87 255 / 0.72);
+  background: #f7f5ff;
+}
+
+.flow-node.failed {
+  border-color: rgb(217 75 95 / 0.52);
+}
+
+.flow-node-top,
+.flow-node-agent {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.flow-node-top {
+  margin: -11px -12px 0;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  background: #eeeeec;
+  font-family: "SFMono-Regular", Consolas, monospace;
+}
+
+.flow-node.artifact .flow-node-top {
+  background: #4c35d5;
+  color: white;
+}
+
+.flow-node-index {
+  min-width: 18px;
+  color: inherit;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.flow-node-kind {
+  overflow: hidden;
+  color: inherit;
+  font-size: 10px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.flow-node-agent {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.flow-node-agent .agent-avatar {
+  width: 28px;
+}
+
+.flow-node-icon {
+  width: 28px;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.flow-node strong {
+  overflow: hidden;
+  display: -webkit-box;
+  font-size: 13px;
+  line-height: 17px;
+  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.flow-node small {
+  overflow: hidden;
+  display: -webkit-box;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 15px;
+  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.flow-node-meta {
+  width: max-content;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 4px 7px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 840;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.flow-node-meta.running {
+  border-color: rgb(102 87 255 / 0.2);
+  background: rgb(102 87 255 / 0.1);
+  color: #4d3fe0;
+}
+
+.flow-node-meta.completed {
+  border-color: rgb(22 155 87 / 0.2);
+  background: rgb(22 155 87 / 0.1);
+  color: #0f7a43;
+}
+
+.flow-node-meta.failed {
+  border-color: rgb(217 75 95 / 0.24);
+  background: rgb(217 75 95 / 0.11);
+  color: #a73143;
+}
+
 .workflow-node {
   position: relative;
   flex: 0 0 174px;
