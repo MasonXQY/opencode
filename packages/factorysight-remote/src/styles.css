@@ -794,7 +794,7 @@ h3 {
 
 .workspace-grid {
   display: grid;
-  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  grid-template-columns: minmax(320px, 390px) minmax(0, 1fr);
   height: 100%;
   min-height: 0;
   overflow: hidden;
@@ -839,6 +839,10 @@ h3 {
   padding: 14px;
 }
 
+.panel > h2 {
+  margin-bottom: 0;
+}
+
 .panel-intro,
 .field-hint,
 .field-count {
@@ -878,7 +882,15 @@ h3 {
 
 .mission-panel {
   border-color: var(--presight-color-blue-200);
-  background: color-mix(in srgb, var(--factory-surface) 86%, var(--presight-color-blue-25));
+  background: var(--factory-surface);
+}
+
+.mission-panel form {
+  gap: 10px;
+}
+
+.mission-panel textarea {
+  min-height: 96px;
 }
 
 .panel-toggle {
@@ -886,6 +898,52 @@ h3 {
   background: var(--factory-surface);
   color: var(--presight-color-blue-700);
   border-color: var(--presight-color-blue-200);
+}
+
+.project-picker {
+  display: grid;
+  gap: 8px;
+  max-height: 168px;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--presight-color-gray-300) transparent;
+}
+
+.project-picker button {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 10px 11px;
+  text-align: left;
+  background: var(--factory-surface);
+  color: var(--presight-color-gray-800);
+  border-color: var(--presight-color-gray-200);
+  box-shadow: none;
+}
+
+.project-picker button:hover {
+  border-color: var(--presight-color-blue-200);
+  background: var(--presight-color-blue-50);
+}
+
+.project-picker button.active {
+  border-color: var(--presight-color-blue-500);
+  background: var(--presight-color-blue-25);
+  box-shadow: var(--presight-shadow-input);
+}
+
+.project-picker strong,
+.project-picker small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-picker small {
+  color: var(--presight-color-gray-500);
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .form-grid,
@@ -910,7 +968,7 @@ h3 {
 }
 
 .mode-cards button {
-  min-height: 84px;
+  min-height: 68px;
   display: grid;
   align-content: start;
   gap: 6px;
@@ -950,6 +1008,79 @@ h3 {
   border: 1px solid var(--presight-color-blue-200);
   border-radius: var(--presight-radius-md);
   background: color-mix(in srgb, var(--presight-color-blue-25) 72%, var(--factory-surface));
+}
+
+.advanced-config {
+  display: grid;
+  border: 1px solid var(--presight-color-gray-200);
+  border-radius: var(--presight-radius-md);
+  background: var(--presight-color-gray-25);
+}
+
+.advanced-config summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, auto);
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  color: var(--presight-color-gray-800);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 800;
+  list-style: none;
+}
+
+.advanced-config summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-config summary::before {
+  content: "+";
+  width: 20px;
+  aspect-ratio: 1;
+  display: inline-grid;
+  place-items: center;
+  justify-self: start;
+  border: 1px solid var(--presight-color-gray-300);
+  border-radius: 999px;
+  color: var(--presight-color-gray-600);
+  font-size: 14px;
+  line-height: 18px;
+}
+
+.advanced-config summary span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.advanced-config summary small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--presight-color-gray-500);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.advanced-config[open] summary {
+  border-bottom: 1px solid var(--presight-color-gray-200);
+}
+
+.advanced-config[open] summary::before {
+  content: "-";
+  border-color: var(--presight-color-blue-500);
+  color: var(--presight-color-blue-700);
+}
+
+.advanced-config-body {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
 }
 
 .product-style-grid {
@@ -1018,15 +1149,85 @@ h3 {
 }
 
 .task-list {
-  max-height: 48vh;
+  min-height: min(34vh, 320px);
+  max-height: 52vh;
   overflow: auto;
+}
+
+.task-list-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.task-list-summary span {
+  border: 1px solid var(--presight-color-gray-200);
+  border-radius: 999px;
+  background: var(--presight-color-gray-25);
+  color: var(--presight-color-gray-700);
+  padding: 4px 8px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 800;
+}
+
+.task-empty {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 1px dashed var(--presight-color-gray-300);
+  border-radius: var(--presight-radius-md);
+  background: var(--presight-color-gray-25);
+  color: var(--presight-color-gray-600);
+}
+
+.task-empty strong {
+  color: var(--presight-color-gray-800);
+}
+
+.task-empty span {
+  font-size: 13px;
+  line-height: 18px;
 }
 
 .task-card {
   width: 100%;
   display: grid;
-  gap: 8px;
+  gap: 7px;
   margin-bottom: 8px;
+}
+
+.task-card-top {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+}
+
+.task-card-top strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--presight-color-gray-900);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-assignee {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.task-assignee > span {
+  color: var(--presight-color-gray-500);
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .task-card small,

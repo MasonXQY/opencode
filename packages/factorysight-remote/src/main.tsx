@@ -273,8 +273,9 @@ function Workspace(props: {
     props.data.tasks.filter((task) => task.projectId === activeProjectId() && task.status !== "archived"),
   )
   const selectedTask = createMemo(() => projectTasks().find((task) => task.id === props.selectedTaskId))
-  const counts = createMemo(() => taskCounts(projectTasks()))
-  const freshestTask = createMemo(() => latestTask(projectTasks()))
+  const workspaceTasks = createMemo(() => props.data.tasks.filter((task) => task.status !== "archived"))
+  const counts = createMemo(() => taskCounts(workspaceTasks()))
+  const freshestTask = createMemo(() => latestTask(workspaceTasks()))
 
   createEffect(() => {
     const current = activeProjectId()
@@ -293,10 +294,7 @@ function Workspace(props: {
         <div class="topbar-primary">
           <div>
             <div class="brand">FactorySight Remote</div>
-            <div class="muted">
-              {props.data.user.name}
-              <Show when={activeProject()}> · {activeProject()?.name}</Show>
-            </div>
+            <div class="muted">{props.data.user.name}</div>
           </div>
           <div class="workspace-summary" aria-label="Workspace task summary">
             <span>
@@ -355,13 +353,13 @@ function Workspace(props: {
               await props.onRefresh()
             }}
           />
+          <TaskList data={props.data} tasks={projectTasks()} selected={props.selectedTaskId} onSelect={props.onSelectTask} />
           <TaskForm
             data={props.data}
             api={props.api}
             activeProjectId={activeProject()?.id}
             onCreated={props.onRefresh}
           />
-          <TaskList data={props.data} tasks={projectTasks()} selected={props.selectedTaskId} onSelect={props.onSelectTask} />
         </aside>
         <section class="detail">
           <Show when={selectedTask()} fallback={<EmptyState />}>
@@ -687,9 +685,21 @@ function ProjectSwitcher(props: {
         <span>{props.projects.length} total</span>
       </div>
       <Show when={props.projects.length > 0} fallback={<div class="muted">Create a project to start.</div>}>
-        <select value={props.activeProjectId ?? ""} onChange={(event) => props.onChange(event.currentTarget.value)}>
-          <For each={props.projects}>{(project) => <option value={project.id}>{project.name}</option>}</For>
-        </select>
+        <div class="project-picker" role="listbox" aria-label="Projects">
+          <For each={props.projects}>
+            {(project) => (
+              <button
+                type="button"
+                classList={{ active: project.id === props.activeProjectId }}
+                aria-pressed={project.id === props.activeProjectId}
+                onClick={() => props.onChange(project.id)}
+              >
+                <strong>{project.name}</strong>
+                <small>{project.path}</small>
+              </button>
+            )}
+          </For>
+        </div>
       </Show>
     </section>
   )
@@ -811,9 +821,7 @@ function TaskForm(props: { data: BootstrapData; api: ApiClient; activeProjectId:
         <h2>Mission composer</h2>
         <span>{mode() === "team" ? "Agent Swarm" : "Direct Agent"}</span>
       </div>
-      <p class="panel-intro">
-        Launch agent work with the outcome, model, visibility, and product style in one place.
-      </p>
+      <p class="panel-intro">Describe the outcome. Advanced routing stays available without taking over the sidebar.</p>
       <form
         class="stack"
         onSubmit={async (event) => {
@@ -874,123 +882,149 @@ function TaskForm(props: { data: BootstrapData; api: ApiClient; activeProjectId:
           />
         </label>
         <p class="field-hint">Write the success condition first; constraints and references can follow.</p>
-        <Show when={mode() === "team"}>
-          <div class="scale-row">
-            <button type="button" classList={{ active: scale() === "focused" }} onClick={() => setScale("focused")}>
-              Focused
-              <span>3-4 agents</span>
-            </button>
-            <button type="button" classList={{ active: scale() === "balanced" }} onClick={() => setScale("balanced")}>
-              Balanced
-              <span>Up to 8 agents</span>
-            </button>
-            <button type="button" classList={{ active: scale() === "wide" }} onClick={() => setScale("wide")}>
-              Wide
-              <span>Full review</span>
-            </button>
-          </div>
-        </Show>
-        <div class="product-style-panel">
-          <div class="section-heading">
-            <h2>Design library</h2>
-            <span>{selectedStyle().name}</span>
-          </div>
-          <div class="product-style-grid">
-            <For each={productStyles}>
-              {(style) => (
-                <button
-                  type="button"
-                  classList={{ active: productStyle() === style.id }}
-                  onClick={() => setProductStyle(style.id)}
-                >
-                  <i data-swatch={style.id} />
-                  <span>
-                    <strong>{style.name}</strong>
-                    <small>{style.summary}</small>
-                  </span>
-                </button>
-              )}
-            </For>
-          </div>
-          <label>
-            Style preferences
-            <input
-              value={styleNotes()}
-              onInput={(event) => setStyleNotes(event.currentTarget.value)}
-              placeholder="Optional: calmer colors, mobile-first, stricter density"
-            />
-          </label>
-        </div>
-        <div class="form-grid">
-          <Show
-            when={mode() === "single"}
-            fallback={
-              <label>
-                Team
-                <input value={`${scale()} swarm`} readOnly />
-              </label>
-            }
-          >
-            <label>
-              Agent
-              <select value={agent()} onChange={(event) => setAgent(event.currentTarget.value)}>
-                <For each={props.data.agents.filter((item) => item !== "orchestrator")}>
-                  {(item) => <option value={item}>{item}</option>}
-                </For>
-              </select>
-            </label>
-          </Show>
-          <label>
-            Model search
-            <input
-              value={modelQuery()}
-              onInput={(event) => setModelQuery(event.currentTarget.value)}
-              placeholder={`${props.data.models.length} backend models available`}
-            />
-            <span class="field-count">{filteredModels().length} matches</span>
-          </label>
-        </div>
-        <label>
-          Model
-          <select value={model()} onChange={(event) => setModel(event.currentTarget.value)}>
-            <For each={filteredModels()}>{(item) => <option value={item}>{item}</option>}</For>
-          </select>
-        </label>
-        <label>
-          Visibility
-          <select
-            value={collaboration()}
-            onChange={(event) => setCollaboration(event.currentTarget.value as "private" | "project" | "shared")}
-          >
-            <option value="private">Private</option>
-            <option value="project">Project</option>
-            <option value="shared">Shared session</option>
-          </select>
-        </label>
         <button disabled={busy() || !projectId() || !prompt()}>
           {busy() ? "Launching..." : mode() === "team" ? "Launch swarm" : "Queue task"}
         </button>
+        <details class="advanced-config">
+          <summary>
+            <span>Advanced routing</span>
+            <small>{model()} · {collaboration()}</small>
+          </summary>
+          <div class="advanced-config-body">
+            <Show when={mode() === "team"}>
+              <div class="scale-row">
+                <button type="button" classList={{ active: scale() === "focused" }} onClick={() => setScale("focused")}>
+                  Focused
+                  <span>3-4 agents</span>
+                </button>
+                <button type="button" classList={{ active: scale() === "balanced" }} onClick={() => setScale("balanced")}>
+                  Balanced
+                  <span>Up to 8 agents</span>
+                </button>
+                <button type="button" classList={{ active: scale() === "wide" }} onClick={() => setScale("wide")}>
+                  Wide
+                  <span>Full review</span>
+                </button>
+              </div>
+            </Show>
+            <div class="form-grid">
+              <Show
+                when={mode() === "single"}
+                fallback={
+                  <label>
+                    Team
+                    <input value={`${scale()} swarm`} readOnly />
+                  </label>
+                }
+              >
+                <label>
+                  Agent
+                  <select value={agent()} onChange={(event) => setAgent(event.currentTarget.value)}>
+                    <For each={props.data.agents.filter((item) => item !== "orchestrator")}>
+                      {(item) => <option value={item}>{item}</option>}
+                    </For>
+                  </select>
+                </label>
+              </Show>
+              <label>
+                Visibility
+                <select
+                  value={collaboration()}
+                  onChange={(event) => setCollaboration(event.currentTarget.value as "private" | "project" | "shared")}
+                >
+                  <option value="private">Private</option>
+                  <option value="project">Project</option>
+                  <option value="shared">Shared session</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              Model search
+              <input
+                value={modelQuery()}
+                onInput={(event) => setModelQuery(event.currentTarget.value)}
+                placeholder={`${props.data.models.length} backend models available`}
+              />
+              <span class="field-count">{filteredModels().length} matches</span>
+            </label>
+            <label>
+              Model
+              <select value={model()} onChange={(event) => setModel(event.currentTarget.value)}>
+                <For each={filteredModels()}>{(item) => <option value={item}>{item}</option>}</For>
+              </select>
+            </label>
+            <div class="product-style-panel">
+              <div class="section-heading">
+                <h2>Design library</h2>
+                <span>{selectedStyle().name}</span>
+              </div>
+              <div class="product-style-grid">
+                <For each={productStyles}>
+                  {(style) => (
+                    <button
+                      type="button"
+                      classList={{ active: productStyle() === style.id }}
+                      onClick={() => setProductStyle(style.id)}
+                    >
+                      <i data-swatch={style.id} />
+                      <span>
+                        <strong>{style.name}</strong>
+                        <small>{style.summary}</small>
+                      </span>
+                    </button>
+                  )}
+                </For>
+              </div>
+              <label>
+                Style preferences
+                <input
+                  value={styleNotes()}
+                  onInput={(event) => setStyleNotes(event.currentTarget.value)}
+                  placeholder="Optional: calmer colors, mobile-first, stricter density"
+                />
+              </label>
+            </div>
+          </div>
+        </details>
       </form>
     </section>
   )
 }
 
 function TaskList(props: { data: BootstrapData; tasks: Task[]; selected: string | undefined; onSelect: (id: string) => void }) {
+  const counts = createMemo(() => taskCounts(props.tasks))
   return (
     <section class="panel task-list">
-      <h2>Tasks</h2>
-      <Show when={props.tasks.length > 0} fallback={<div class="muted">No tasks yet.</div>}>
+      <div class="panel-heading">
+        <h2>Tasks</h2>
+        <span>{props.tasks.length} visible</span>
+      </div>
+      <div class="task-list-summary">
+        <span>{counts().running} running</span>
+        <span>{counts().failed} failed</span>
+        <span>{counts().completed} done</span>
+      </div>
+      <Show
+        when={props.tasks.length > 0}
+        fallback={
+          <div class="task-empty">
+            <strong>No tasks yet</strong>
+            <span>Launch a swarm or queue a direct agent to start building.</span>
+          </div>
+        }
+      >
         <For each={props.tasks}>
           {(task) => (
             <button class="task-card" classList={{ active: props.selected === task.id }} onClick={() => props.onSelect(task.id)}>
               <div class="task-card-top">
-                <AgentAvatar data={props.data} agent={task.agent} compact />
+                <strong>{task.title}</strong>
                 <span class={`status ${task.status}`}>{statusLabel(task.status)}</span>
               </div>
-              <strong>{task.title}</strong>
-              <small>
-                {taskStage(task)} · {task.agent} · {time(task.updatedAt)}
-              </small>
+              <small>{taskStage(task)} · {time(task.updatedAt)}</small>
+              <div class="task-assignee">
+                <span>Assigned to</span>
+                <AgentAvatar data={props.data} agent={task.agent} compact />
+              </div>
             </button>
           )}
         </For>
