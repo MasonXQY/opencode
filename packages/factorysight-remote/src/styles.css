@@ -726,20 +726,22 @@ label {
 .workflow-header {
   position: absolute;
   z-index: 3;
-  top: 56px;
+  top: 12px;
   left: 50%;
-  max-width: min(560px, calc(100vw - 160px));
-  display: grid;
-  justify-items: center;
-  gap: 2px;
-  padding: 8px 12px;
+  max-width: min(480px, 32vw);
+  min-width: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 12px;
   border: 1px solid var(--line);
-  border-radius: 3px;
-  background: rgb(255 255 255 / 0.82);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.76);
   box-shadow: none;
   text-align: center;
   transform: translateX(-50%);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(8px);
 }
 
 .workflow-header h1,
@@ -748,16 +750,18 @@ label {
 }
 
 .workflow-header h1 {
-  max-width: min(42vw, 520px);
+  flex: 0 1 auto;
+  max-width: 140px;
   overflow: hidden;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .workflow-header p {
-  max-width: min(42vw, 520px);
+  flex: 1 1 auto;
+  max-width: 280px;
   overflow: hidden;
   color: var(--muted);
   font-size: 11px;
@@ -766,6 +770,7 @@ label {
 }
 
 .eyebrow {
+  display: none;
   color: var(--muted);
   font-family: "SFMono-Regular", Consolas, monospace;
   font-size: 9px;

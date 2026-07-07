@@ -1288,9 +1288,9 @@ function WorkflowCanvas(props: {
     if (!task) return
     setNodeActionBusy(`rerun:${node.id}`)
     try {
-      await createRunFromTask(task, `${task.title} rerun`)
+      const created = await createRunFromTask(task, `${task.title} rerun`)
       await props.onRefresh()
-      props.onSelectTask(node.taskId)
+      props.onSelectTask(created.id)
     } catch (error) {
       window.alert(error instanceof Error ? error.message : String(error))
     } finally {

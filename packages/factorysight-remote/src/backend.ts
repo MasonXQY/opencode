@@ -30,18 +30,33 @@ export async function backendAgents() {
       }
 }
 
-export async function backendTasks(localTasks: Task[], projects: Project[], userId: string) {
-  if (remoteBackendMode() !== "factorysight") return localTasks
-  const factorySightTasks = await factorySightTasksForProjects(userId, projects)
+export function mergeFactorySightTasks(
+  localTasks: Task[],
+  factorySightTasks: Task[],
+  hiddenFactorySightSessionIds: string[] = [],
+) {
+  const hiddenSessionIds = new Set(hiddenFactorySightSessionIds)
   const tasks = [...localTasks]
   const existingIds = new Set(tasks.map((task) => task.id))
   for (const task of factorySightTasks) {
+    if (task.sessionId && hiddenSessionIds.has(task.sessionId)) continue
     if (!existingIds.has(task.id)) {
       tasks.push(task)
       existingIds.add(task.id)
     }
   }
   return tasks.sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
+}
+
+export async function backendTasks(
+  localTasks: Task[],
+  projects: Project[],
+  userId: string,
+  hiddenFactorySightSessionIds: string[] = [],
+) {
+  if (remoteBackendMode() !== "factorysight") return localTasks
+  const factorySightTasks = await factorySightTasksForProjects(userId, projects)
+  return mergeFactorySightTasks(localTasks, factorySightTasks, hiddenFactorySightSessionIds)
 }
 
 export function enqueueBackendTask(task: Task) {

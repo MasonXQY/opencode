@@ -108,6 +108,7 @@ export type AppState = {
   sessions: Session[]
   projects: Project[]
   tasks: Task[]
+  hiddenFactorySightSessionIds?: string[]
   files?: FileAttachment[]
 }
 

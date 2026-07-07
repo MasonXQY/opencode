@@ -1,7 +1,17 @@
 import path from "node:path"
 import { randomUUID } from "node:crypto"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
-import { defaultPermissionLevel, type AppState, type PermissionLevel, type Project, type Role, type Task, type TaskEvent, type TaskStatus, type User } from "./shared"
+import {
+  defaultPermissionLevel,
+  type AppState,
+  type PermissionLevel,
+  type Project,
+  type Role,
+  type Task,
+  type TaskEvent,
+  type TaskStatus,
+  type User,
+} from "./shared"
 import { createProjectFolders, deleteTaskFiles } from "./file-storage"
 
 const defaultDataDir = path.join(process.env.HOME ?? process.cwd(), ".factorysight-remote")
@@ -32,6 +42,7 @@ async function ensureLoaded() {
   try {
     state = JSON.parse(await readFile(statePath, "utf8")) as AppState
     for (const project of state.projects) project.permissionLevel ??= defaultPermissionLevel
+    state.hiddenFactorySightSessionIds ??= []
     return state
   } catch (error) {
     if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error
@@ -41,6 +52,7 @@ async function ensureLoaded() {
     sessions: [],
     projects: [],
     tasks: [],
+    hiddenFactorySightSessionIds: [],
     files: [],
   }
   await save()
@@ -122,11 +134,7 @@ export async function createProject(input: {
   return project
 }
 
-export async function updateProject(
-  projectId: string,
-  userId: string,
-  patch: { permissionLevel?: PermissionLevel },
-) {
+export async function updateProject(projectId: string, userId: string, patch: { permissionLevel?: PermissionLevel }) {
   const state = await ensureLoaded()
   const project = state.projects.find((item) => item.id === projectId)
   if (!project) throw new Error(`Project not found: ${projectId}`)
@@ -209,10 +217,7 @@ export async function patchTask(
   await save()
 }
 
-export async function appendEvent(
-  taskId: string,
-  input: Omit<TaskEvent, "id" | "taskId" | "at"> & { at?: string },
-) {
+export async function appendEvent(taskId: string, input: Omit<TaskEvent, "id" | "taskId" | "at"> & { at?: string }) {
   const state = await ensureLoaded()
   const task = state.tasks.find((item) => item.id === taskId)
   if (!task) throw new Error(`Task not found: ${taskId}`)
@@ -292,6 +297,14 @@ export async function deleteTask(taskId: string, userId: string) {
   if (project) await deleteTaskFiles(project.path, [...deletedIds])
   await save()
   return { deletedTaskIds: [...deletedIds] }
+}
+
+export async function hideFactorySightSession(sessionId: string) {
+  const state = await ensureLoaded()
+  state.hiddenFactorySightSessionIds ??= []
+  if (!state.hiddenFactorySightSessionIds.includes(sessionId)) state.hiddenFactorySightSessionIds.push(sessionId)
+  await save()
+  return { hiddenFactorySightSessionIds: state.hiddenFactorySightSessionIds }
 }
 
 export async function shareTask(taskId: string, userId: string, role: Role = "collaborator") {

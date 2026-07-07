@@ -12,6 +12,7 @@ import {
   deleteTask,
   getState,
   getVisibleTask,
+  hideFactorySightSession,
   login,
   patchTask,
   setTaskStatus,
@@ -162,7 +163,8 @@ async function visibleProject(projectId: string, userId: string) {
 
 async function visibleBackendTasks(userId: string) {
   const projects = await visibleProjects(userId)
-  return backendTasks(await visibleTasks(userId), projects, userId)
+  const state = await getState()
+  return backendTasks(await visibleTasks(userId), projects, userId, state.hiddenFactorySightSessionIds)
 }
 
 async function getVisibleBackendTask(taskId: string, userId: string) {
@@ -258,7 +260,7 @@ app.get("/api/app/bootstrap", async (c) => {
     user,
     users: state.users,
     projects,
-    tasks: await backendTasks(await visibleTasks(user.id), projects, user.id),
+    tasks: await backendTasks(await visibleTasks(user.id), projects, user.id, state.hiddenFactorySightSessionIds),
     artifacts: await visibleArtifacts(user.id),
     files: (await Promise.all(projects.map((project) => listProjectFiles(project.path)))).flat(),
     agents: agents.agents,
@@ -611,7 +613,15 @@ app.patch("/api/tasks/:taskId", async (c) => {
 app.delete("/api/tasks/:taskId", async (c) => {
   const user = c.get("user")
   try {
-    return c.json(await deleteTask(c.req.param("taskId"), user.id))
+    const taskId = c.req.param("taskId")
+    const localTask = await getVisibleTask(taskId, user.id)
+    if (localTask) return c.json(await deleteTask(taskId, user.id))
+    const backendTask = await getVisibleBackendTask(taskId, user.id)
+    if (backendTask?.sessionId) {
+      await hideFactorySightSession(backendTask.sessionId)
+      return c.json({ deletedTaskIds: [taskId] })
+    }
+    return c.json({ error: "task not found" }, 404)
   } catch (error) {
     return c.json({ error: error instanceof Error ? error.message : String(error) }, 403)
   }
