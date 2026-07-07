@@ -1009,7 +1009,34 @@ function WorkflowCanvas(props: {
   const flow = createMemo(() => applyNodePositions(baseFlow(), manualPositions()))
   const [zoom, setZoom] = createSignal(1)
   const zoomLabel = createMemo(() => `${Math.round(zoom() * 100)}%`)
-  const updateZoom = (delta: number) => setZoom((value) => Math.min(1.28, Math.max(0.72, value + delta)))
+  const clampZoom = (value: number) => Math.min(1.28, Math.max(0.72, value))
+  const updateZoom = (delta: number) => setZoom((value) => clampZoom(value + delta))
+  const setZoomAroundPoint = (nextZoom: number, clientX: number, clientY: number) => {
+    const viewport = nodeViewport
+    if (!viewport) {
+      setZoom(nextZoom)
+      return
+    }
+    const previousZoom = zoom()
+    const rect = viewport.getBoundingClientRect()
+    const localX = clientX - rect.left
+    const localY = clientY - rect.top
+    const contentX = (viewport.scrollLeft + localX) / previousZoom
+    const contentY = (viewport.scrollTop + localY) / previousZoom
+    setZoom(nextZoom)
+    requestAnimationFrame(() => {
+      viewport.scrollLeft = Math.max(0, contentX * nextZoom - localX)
+      viewport.scrollTop = Math.max(0, contentY * nextZoom - localY)
+    })
+  }
+  const handleViewportWheel = (event: WheelEvent) => {
+    const shouldZoom = event.ctrlKey || event.metaKey || Math.abs(event.deltaZ) > 0
+    if (!shouldZoom) return
+    event.preventDefault()
+    const delta = Math.max(-0.18, Math.min(0.18, -event.deltaY * 0.0025))
+    if (!delta) return
+    setZoomAroundPoint(clampZoom(zoom() + delta), event.clientX, event.clientY)
+  }
   const taskById = createMemo(() => new Map(props.tasks.map((task) => [task.id, task])))
   const moveNode = (nodeId: string, position: NodePosition) => {
     setManualPositions((current) => ({
@@ -1147,7 +1174,7 @@ function WorkflowCanvas(props: {
           </button>
         </div>
       </div>
-      <div class="node-viewport" ref={nodeViewport}>
+      <div class="node-viewport" ref={nodeViewport} onWheel={handleViewportWheel}>
         <div
           class="node-flow graph-flow"
           style={{ "--canvas-zoom": zoom(), width: `${flow().width}px`, height: `${flow().height}px` }}
