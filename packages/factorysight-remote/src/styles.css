@@ -620,6 +620,32 @@ label {
   gap: 8px;
 }
 
+.data-source {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.data-source strong,
+.data-source small {
+  display: block;
+}
+
+.data-source small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.gmail-import {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
 .file-uploader label,
 .attach-control {
   min-height: 40px;

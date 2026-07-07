@@ -6,6 +6,9 @@ import type {
   CreateProjectPayload,
   CreateTaskPayload,
   FileAttachment,
+  GmailImportPayload,
+  GmailImportResult,
+  GmailStatus,
   Project,
   ShareTaskPayload,
   Task,
@@ -55,6 +58,18 @@ export class ApiClient {
     return this.request<BootstrapData>("/api/app/bootstrap")
   }
 
+  gmailStatus() {
+    return this.request<GmailStatus>("/api/integrations/gmail/status")
+  }
+
+  connectGmail() {
+    return this.request<{ url: string }>("/api/integrations/gmail/connect", { method: "POST" })
+  }
+
+  disconnectGmail() {
+    return this.request<GmailStatus>("/api/integrations/gmail", { method: "DELETE" })
+  }
+
   createProject(payload: CreateProjectPayload) {
     return this.request<Project>("/api/projects", {
       method: "POST",
@@ -87,6 +102,13 @@ export class ApiClient {
   projectFileUrl(projectId: string, fileId: string) {
     const suffix = this.token ? `?token=${encodeURIComponent(this.token)}` : ""
     return `/api/projects/${encodeURIComponent(projectId)}/files/${encodeURIComponent(fileId)}${suffix}`
+  }
+
+  importGmail(projectId: string, payload: GmailImportPayload) {
+    return this.request<GmailImportResult>(`/api/projects/${projectId}/gmail/import`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    })
   }
 
   taskFiles(taskId: string) {

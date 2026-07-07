@@ -34,6 +34,8 @@ import { childPrompt, initialOrchestrationPlan } from "./orchestration"
 import { permissionProfiles, type Artifact, type Project, type Task, type User } from "./shared"
 import { listProjectFiles, saveUploadedFile } from "./file-storage"
 import { listProjectArtifacts, writeTaskDeliverableArtifact } from "./artifact-storage"
+import { completeGmailAuthorization, gmailAuthorizationUrl, importGmailMessages } from "./gmail-client"
+import { clearGmailToken, gmailStatus } from "./gmail-storage"
 
 export const app = new Hono<{ Variables: { user: User } }>()
 const sourceDir =
@@ -78,6 +80,10 @@ const shareTaskSchema = z.object({
   userId: z.string().min(1),
   role: z.enum(["owner", "collaborator", "reviewer", "viewer"]).default("collaborator"),
 })
+const gmailImportSchema = z.object({
+  query: z.string().optional(),
+  maxResults: z.number().int().min(1).max(25).default(10),
+})
 const maxUploadBytes = 25 * 1024 * 1024
 type FormLike = {
   get(key: string): unknown
@@ -118,6 +124,7 @@ app.use("/api/app/*", requireUser)
 app.use("/api/projects", requireUser)
 app.use("/api/projects/*", requireUser)
 app.use("/api/permissions", requireUser)
+app.use("/api/integrations/*", requireUser)
 app.use("/api/tasks", requireUser)
 app.use("/api/tasks/*", requireUser)
 app.use("/api/orchestrations", requireUser)
@@ -252,8 +259,30 @@ app.get("/api/app/bootstrap", async (c) => {
     agentProfiles: agents.agentProfiles,
     models: await backendModels(),
     backendMode: remoteBackendMode(),
+    gmail: await gmailStatus(user.id),
     permissionProfiles,
   })
+})
+
+app.get("/api/integrations/gmail/status", async (c) => {
+  return c.json(await gmailStatus(c.get("user").id))
+})
+
+app.post("/api/integrations/gmail/connect", async (c) => {
+  return c.json({ url: await gmailAuthorizationUrl(c.get("user").id) })
+})
+
+app.get("/api/integrations/gmail/callback", async (c) => {
+  const code = c.req.query("code")
+  const state = c.req.query("state")
+  if (!code || !state) return c.text("Missing Gmail authorization code or state", 400)
+  await completeGmailAuthorization({ code, state })
+  return c.html("<!doctype html><title>Gmail connected</title><p>Gmail is connected. You can close this window.</p>")
+})
+
+app.delete("/api/integrations/gmail", async (c) => {
+  await clearGmailToken(c.get("user").id)
+  return c.json({ connected: false })
 })
 
 app.get("/api/projects/:projectId/artifacts/*", async (c) => {
@@ -312,6 +341,23 @@ app.post("/api/projects/:projectId/files", async (c) => {
     ),
   )
   return c.json({ files: saved })
+})
+
+app.post("/api/projects/:projectId/gmail/import", async (c) => {
+  const user = c.get("user")
+  const project = await visibleProject(c.req.param("projectId"), user.id)
+  if (!project) return c.json({ error: "project not found" }, 404)
+  const body = gmailImportSchema.parse(await c.req.json())
+  const imported = await importGmailMessages({ userId: user.id, query: body.query, maxResults: body.maxResults })
+  const fileName = `gmail-${Date.now()}.json`
+  const file = await saveUploadedFile({
+    projectId: project.id,
+    projectPath: project.path,
+    scope: "project",
+    uploadedBy: user.id,
+    file: new File([JSON.stringify(imported, null, 2)], fileName, { type: "application/json" }),
+  })
+  return c.json({ file, imported: imported.messages.length })
 })
 
 app.get("/api/projects/:projectId/files/:fileId", async (c) => {

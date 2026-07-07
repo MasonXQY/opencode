@@ -55,6 +55,23 @@ export type FileAttachment = {
   createdAt: string
 }
 
+export type GmailStatus = {
+  connected: boolean
+  email?: string
+  scope?: string
+  updatedAt?: string
+}
+
+export type GmailImportPayload = {
+  query?: string
+  maxResults?: number
+}
+
+export type GmailImportResult = {
+  file: FileAttachment
+  imported: number
+}
+
 export type Task = {
   id: string
   projectId: string
@@ -156,6 +173,7 @@ export type BootstrapData = {
   agentProfiles: Record<string, AgentProfile>
   models: string[]
   backendMode?: "local" | "factorysight"
+  gmail: GmailStatus
   permissionProfiles: PermissionProfile[]
 }
 

@@ -991,8 +991,75 @@ function ProjectFiles(props: {
 }) {
   const [files, setFiles] = createSignal<File[]>([])
   const [busy, setBusy] = createSignal(false)
+  const [gmailBusy, setGmailBusy] = createSignal(false)
+  const [gmailQuery, setGmailQuery] = createSignal("newer_than:30d")
+  const [gmailError, setGmailError] = createSignal("")
+  const [gmailStatus, setGmailStatus] = createSignal(props.data.gmail)
+  createEffect(() => setGmailStatus(props.data.gmail))
   return (
     <Panel heading="Files" meta={`${props.files.length} project`}>
+      <section class="data-source">
+        <div>
+          <strong>Gmail input</strong>
+          <small>
+            {gmailStatus().connected
+              ? `Connected${gmailStatus().email ? ` as ${gmailStatus().email}` : ""}`
+              : "Connect Gmail to import messages as project data."}
+          </small>
+        </div>
+        <Show
+          when={gmailStatus().connected}
+          fallback={
+            <button
+              type="button"
+              class="secondary"
+              disabled={gmailBusy()}
+              onClick={async () => {
+                setGmailBusy(true)
+                setGmailError("")
+                try {
+                  const { url } = await props.api.connectGmail()
+                  openInNewWindow(url)
+                } catch (error) {
+                  setGmailError(error instanceof Error ? error.message : String(error))
+                } finally {
+                  setGmailBusy(false)
+                }
+              }}
+            >
+              {gmailBusy() ? "Opening..." : "Connect Gmail"}
+            </button>
+          }
+        >
+          <form
+            class="gmail-import"
+            onSubmit={async (event) => {
+              event.preventDefault()
+              if (!props.activeProjectId) return
+              setGmailBusy(true)
+              setGmailError("")
+              try {
+                await props.api.importGmail(props.activeProjectId, { query: gmailQuery(), maxResults: 10 })
+                await props.onRefresh()
+              } catch (error) {
+                setGmailError(error instanceof Error ? error.message : String(error))
+              } finally {
+                setGmailBusy(false)
+              }
+            }}
+          >
+            <input
+              value={gmailQuery()}
+              onInput={(event) => setGmailQuery(event.currentTarget.value)}
+              placeholder="Gmail search query"
+            />
+            <button disabled={!props.activeProjectId || gmailBusy()}>{gmailBusy() ? "Importing..." : "Import"}</button>
+          </form>
+        </Show>
+        <Show when={gmailError()}>
+          <small class="composer-error">{gmailError()}</small>
+        </Show>
+      </section>
       <form
         class="file-uploader"
         onSubmit={async (event) => {
