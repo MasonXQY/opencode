@@ -725,50 +725,54 @@ function TopBar(props: {
         <span>{props.data.backendMode === "factorysight" ? "FactorySight backend" : "Local backend"}</span>
       </div>
       <div class="top-actions">
-        <button
-          class="secondary"
-          classList={{ active: props.workspaceOpen }}
-          onClick={props.onWorkspaceOpen}
-          aria-pressed={props.workspaceOpen}
-        >
-          Workspace
-        </button>
-        <button
-          class="secondary"
-          classList={{ active: props.detailsOpen }}
-          onClick={props.onDetailsOpen}
-          aria-pressed={props.detailsOpen}
-        >
-          Details
-        </button>
-        <div class="view-toggle" aria-label="Workspace view">
+        <div class="top-panel-controls" aria-label="Panel controls">
           <button
-            classList={{ active: props.view === "workflow" }}
-            aria-pressed={props.view === "workflow"}
-            onClick={() => props.onView("workflow")}
+            class="secondary"
+            classList={{ active: props.workspaceOpen }}
+            onClick={props.onWorkspaceOpen}
+            aria-pressed={props.workspaceOpen}
           >
-            Workflow
+            Workspace
           </button>
           <button
-            classList={{ active: props.view === "cli" }}
-            aria-pressed={props.view === "cli"}
-            onClick={() => props.onView("cli")}
+            class="secondary"
+            classList={{ active: props.detailsOpen }}
+            onClick={props.onDetailsOpen}
+            aria-pressed={props.detailsOpen}
           >
-            CLI
+            Details
+          </button>
+          <div class="view-toggle" aria-label="Workspace view">
+            <button
+              classList={{ active: props.view === "workflow" }}
+              aria-pressed={props.view === "workflow"}
+              onClick={() => props.onView("workflow")}
+            >
+              Workflow
+            </button>
+            <button
+              classList={{ active: props.view === "cli" }}
+              aria-pressed={props.view === "cli"}
+              onClick={() => props.onView("cli")}
+            >
+              CLI
+            </button>
+          </div>
+        </div>
+        <div class="top-system-controls" aria-label="System controls">
+          <PermissionControl
+            project={props.project}
+            profiles={props.data.permissionProfiles}
+            api={props.api}
+            onChanged={props.onRefresh}
+          />
+          <button class="secondary" onClick={props.onRefresh}>
+            Sync
+          </button>
+          <button class="secondary" onClick={props.onLogout}>
+            Sign out
           </button>
         </div>
-        <PermissionControl
-          project={props.project}
-          profiles={props.data.permissionProfiles}
-          api={props.api}
-          onChanged={props.onRefresh}
-        />
-        <button class="secondary" onClick={props.onRefresh}>
-          Sync
-        </button>
-        <button class="secondary" onClick={props.onLogout}>
-          Sign out
-        </button>
       </div>
     </header>
   )
@@ -1368,17 +1372,14 @@ function WorkflowCanvas(props: {
       <div class="canvas-grid" aria-hidden="true" />
       <div class="canvas-toolstrip">
         <button type="button" class="secondary" onClick={props.onStartWorkflow}>
-          New node
+          New
         </button>
         <button
           class="secondary"
           disabled={!workflowRootTask() || Boolean(nodeActionBusy())}
           onClick={runWorkflowAgain}
         >
-          Run workflow again
-        </button>
-        <button type="button" class="secondary" onClick={props.onRefresh}>
-          Sync
+          Rerun
         </button>
       </div>
       <div class="workflow-header">
@@ -2203,6 +2204,11 @@ function MissionCommandBar(props: {
               }
             />
             <div class="voice-tools">
+              <Show when={voiceError()}>
+                <small>{voiceError()}</small>
+              </Show>
+            </div>
+            <div class="mission-inline-actions">
               <button
                 type="button"
                 class="secondary voice-button"
@@ -2214,11 +2220,6 @@ function MissionCommandBar(props: {
               >
                 {listening() ? "Listening" : "Voice"}
               </button>
-              <Show when={voiceError()}>
-                <small>{voiceError()}</small>
-              </Show>
-            </div>
-            <div class="mission-inline-actions">
               <button
                 type="button"
                 class="secondary"
