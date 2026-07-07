@@ -1267,7 +1267,7 @@ function FlowNodeCard(props: {
   const profile = createMemo(() => (props.node.agent ? props.data.agentProfiles[props.node.agent] : undefined))
   const bodyTitle = createMemo(() => {
     const agent = profile()
-    if (agent) return agent.name
+    if (agent) return agent.title
     if (props.node.kind === "input") return "Input package"
     if (props.node.kind === "artifact") return "Deliverables"
     if (props.node.kind === "placeholder") return "Generated flow"
@@ -1275,7 +1275,7 @@ function FlowNodeCard(props: {
   })
   const bodySubtitle = createMemo(() => {
     const agent = profile()
-    if (agent) return `${agent.title} · ${props.node.subtitle}`
+    if (agent) return props.node.subtitle
     return props.node.subtitle
   })
   let startX = 0
