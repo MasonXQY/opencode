@@ -1204,9 +1204,14 @@ function WorkflowCanvas(props: {
   const [nodeActionBusy, setNodeActionBusy] = createSignal<string | undefined>()
   const flow = createMemo(() => applyNodePositions(baseFlow(), manualPositions()))
   const [zoom, setZoom] = createSignal(1)
+  const [panning, setPanning] = createSignal(false)
   const zoomLabel = createMemo(() => `${Math.round(zoom() * 100)}%`)
   const clampZoom = (value: number) => Math.min(1.28, Math.max(0.72, value))
   const updateZoom = (delta: number) => setZoom((value) => clampZoom(value + delta))
+  let panStartX = 0
+  let panStartY = 0
+  let panStartScrollLeft = 0
+  let panStartScrollTop = 0
   const setZoomAroundPoint = (nextZoom: number, clientX: number, clientY: number) => {
     const viewport = nodeViewport
     if (!viewport) {
@@ -1232,6 +1237,29 @@ function WorkflowCanvas(props: {
     const delta = Math.max(-0.18, Math.min(0.18, -event.deltaY * 0.0025))
     if (!delta) return
     setZoomAroundPoint(clampZoom(zoom() + delta), event.clientX, event.clientY)
+  }
+  const beginViewportPan = (event: PointerEvent) => {
+    if (event.button !== 0) return
+    if ((event.target as HTMLElement).closest(".flow-node, button, a, input, textarea, select")) return
+    const viewport = nodeViewport
+    if (!viewport) return
+    panStartX = event.clientX
+    panStartY = event.clientY
+    panStartScrollLeft = viewport.scrollLeft
+    panStartScrollTop = viewport.scrollTop
+    setPanning(true)
+    viewport.setPointerCapture(event.pointerId)
+  }
+  const panViewport = (event: PointerEvent) => {
+    const viewport = nodeViewport
+    if (!viewport || !viewport.hasPointerCapture(event.pointerId)) return
+    viewport.scrollLeft = panStartScrollLeft - (event.clientX - panStartX)
+    viewport.scrollTop = panStartScrollTop - (event.clientY - panStartY)
+  }
+  const endViewportPan = (event: PointerEvent) => {
+    const viewport = nodeViewport
+    if (viewport?.hasPointerCapture(event.pointerId)) viewport.releasePointerCapture(event.pointerId)
+    setPanning(false)
   }
   const taskById = createMemo(() => new Map(props.tasks.map((task) => [task.id, task])))
   const moveNode = (nodeId: string, position: NodePosition) => {
@@ -1421,7 +1449,16 @@ function WorkflowCanvas(props: {
         when={hasWorkflow()}
         fallback={<CanvasEmpty project={props.project} onStartWorkflow={props.onStartWorkflow} />}
       >
-        <div class="node-viewport" ref={nodeViewport} onWheel={handleViewportWheel}>
+        <div
+          class="node-viewport"
+          classList={{ panning: panning() }}
+          ref={nodeViewport}
+          onWheel={handleViewportWheel}
+          onPointerDown={beginViewportPan}
+          onPointerMove={panViewport}
+          onPointerUp={endViewportPan}
+          onPointerCancel={endViewportPan}
+        >
           <div
             class="node-flow graph-flow"
             style={{ "--canvas-zoom": zoom(), width: `${flow().width}px`, height: `${flow().height}px` }}

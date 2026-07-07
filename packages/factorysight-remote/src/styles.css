@@ -873,7 +873,12 @@ label {
   border: 0;
   border-radius: 0;
   background: transparent;
+  cursor: grab;
   scrollbar-width: none;
+}
+
+.node-viewport.panning {
+  cursor: grabbing;
 }
 
 .node-viewport::-webkit-scrollbar {
