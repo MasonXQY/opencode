@@ -1047,20 +1047,46 @@ function WorkflowCanvas(props: {
       },
     }))
   }
+  const createRunFromTask = (task: Task, title: string) =>
+    task.kind === "orchestration"
+      ? props.api.createOrchestration({
+          projectId: task.projectId,
+          title,
+          prompt: task.prompt,
+          model: task.model,
+          collaboration: task.collaboration,
+          scale: "balanced",
+        })
+      : props.api.createTask({
+          projectId: task.projectId,
+          title,
+          prompt: task.prompt,
+          agent: task.agent,
+          model: task.model,
+          collaboration: task.collaboration,
+        })
   const duplicateNode = async (node: FlowNode) => {
     if (!node.taskId) return
     const task = taskById().get(node.taskId)
     if (!task) return
     setNodeActionBusy(`duplicate:${node.id}`)
     try {
-      const created = await props.api.createTask({
-        projectId: task.projectId,
-        title: `${task.title} copy`,
-        prompt: task.prompt,
-        agent: task.agent,
-        model: task.model,
-        collaboration: task.collaboration,
-      })
+      const created = await createRunFromTask(task, `${task.title} copy`)
+      await props.onRefresh()
+      props.onSelectTask(created.id)
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : String(error))
+    } finally {
+      setNodeActionBusy(undefined)
+    }
+  }
+  const runNodeAgain = async (node: FlowNode) => {
+    if (!node.taskId) return
+    const task = taskById().get(node.taskId)
+    if (!task) return
+    setNodeActionBusy(`rerun:${node.id}`)
+    try {
+      const created = await createRunFromTask(task, `${task.title} rerun`)
       await props.onRefresh()
       props.onSelectTask(created.id)
     } catch (error) {
@@ -1191,6 +1217,7 @@ function WorkflowCanvas(props: {
                 actionBusy={nodeActionBusy()}
                 onSelect={() => node.taskId && props.onSelectTask(node.taskId)}
                 onMove={moveNode}
+                onRunAgain={runNodeAgain}
                 onDuplicate={duplicateNode}
                 onDelete={deleteNode}
               />
@@ -1261,6 +1288,7 @@ function FlowNodeCard(props: {
   actionBusy: string | undefined
   onSelect: () => void
   onMove: (nodeId: string, position: NodePosition) => void
+  onRunAgain: (node: FlowNode) => void | Promise<void>
   onDuplicate: (node: FlowNode) => void | Promise<void>
   onDelete: (node: FlowNode) => void | Promise<void>
 }) {
@@ -1345,8 +1373,22 @@ function FlowNodeCard(props: {
         <div class="flow-node-actions" aria-label="Node actions">
           <button
             type="button"
+            class="flow-node-action run"
+            aria-label="Run node again"
+            title="Run again"
+            disabled={actionDisabled()}
+            onClick={(event) => {
+              event.stopPropagation()
+              void props.onRunAgain(props.node)
+            }}
+          >
+            R
+          </button>
+          <button
+            type="button"
             class="flow-node-action"
             aria-label="Duplicate node"
+            title="Duplicate"
             disabled={actionDisabled()}
             onClick={(event) => {
               event.stopPropagation()
@@ -1359,6 +1401,7 @@ function FlowNodeCard(props: {
             type="button"
             class="flow-node-action danger"
             aria-label="Delete node"
+            title="Delete"
             disabled={actionDisabled()}
             onClick={(event) => {
               event.stopPropagation()

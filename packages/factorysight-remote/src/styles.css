@@ -952,6 +952,12 @@ label {
   box-shadow: 0 8px 18px rgb(24 25 27 / 0.09);
 }
 
+.flow-node-action.run {
+  border-color: rgb(22 155 87 / 0.3);
+  background: rgb(22 155 87 / 0.12);
+  color: #0f7a43;
+}
+
 .flow-node-action.danger {
   border-color: rgb(217 75 95 / 0.8);
   background: #d94b5f;
