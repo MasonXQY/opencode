@@ -387,11 +387,19 @@ async function appendAdaptiveFactorySightChildren(
 ) {
   const state = await getState()
   const currentChildren = state.tasks.filter((task) => task.parentTaskId === parent.id)
+  const completedOutput = completed.events
+    .filter((event) => ["deliverable", "runner", "error", "handoff", "system"].includes(event.type))
+    .slice(-20)
+    .map((event) => event.text)
+    .join("\n")
+  const availableAgents = (await factorySightAgents()).agents
   const steps = adaptiveOrchestrationSteps({
     prompt: parent.prompt,
     scale,
     completedAgent: completed.agent,
     existingAgents: currentChildren.map((task) => task.agent),
+    completedOutput,
+    availableAgents,
   })
   if (!steps.length) return
 
@@ -428,7 +436,7 @@ async function runFactorySightTaskChain(parentTaskId: string, taskIds: string[],
     const parent = state.tasks.find((item) => item.id === parentTaskId)
     const task = state.tasks.find((item) => item.id === taskId)
     if (!parent || !task) continue
-    const step = orchestrationStepForTask(parent, task, scale)
+    const step = orchestrationStepForTask(parent, task, scale, (await factorySightAgents()).agents)
     const previous =
       index === 0
         ? "orchestrator"
@@ -475,7 +483,7 @@ async function runFactorySightTaskChain(parentTaskId: string, taskIds: string[],
       text: handoffText({ from: task.agent, to: "orchestrator", step, status: "accepted" }),
     })
     await appendEvent(parentTaskId, { type: "system", text: `Completed ${task.agent}: ${task.title}` })
-    await appendAdaptiveFactorySightChildren(parent, task, taskIds, index, scale)
+    await appendAdaptiveFactorySightChildren(parent, updated ?? task, taskIds, index, scale)
   }
   await setTaskStatus(parentTaskId, "completed", "FactorySight backend orchestration completed")
 }

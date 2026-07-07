@@ -489,6 +489,7 @@ app.post("/api/orchestrations", async (c) => {
   if (!project) return c.json({ error: "project not found" }, 404)
 
   if (body.intent === "modify") {
+    const availableAgents = (await backendAgents()).agents
     const tasks = await visibleTasks(user.id)
     const parent =
       (body.parentTaskId ? tasks.find((task) => task.id === body.parentTaskId) : undefined) ??
@@ -502,7 +503,7 @@ app.post("/api/orchestrations", async (c) => {
       text: `Workflow change requested: ${body.prompt}`,
     })
 
-    const steps = initialOrchestrationPlan(body.prompt, body.scale)
+    const steps = initialOrchestrationPlan(body.prompt, body.scale, availableAgents)
     const children: Task[] = []
     const parentContext = { ...parent, title: body.title, prompt: body.prompt }
     for (const step of steps) {
@@ -537,6 +538,7 @@ app.post("/api/orchestrations", async (c) => {
     )
   }
 
+  const availableAgents = (await backendAgents()).agents
   let parent = await createTask({
     creatorId: user.id,
     projectId: body.projectId,
@@ -553,7 +555,7 @@ app.post("/api/orchestrations", async (c) => {
     text: `Autonomous Agent Swarm queued in ${body.scale} mode. Main planning runs first, then specialist roles run in sequence.`,
   })
 
-  const steps = initialOrchestrationPlan(body.prompt, body.scale)
+  const steps = initialOrchestrationPlan(body.prompt, body.scale, availableAgents)
   const children: Task[] = []
   for (const step of steps) {
     const child = await createTask({

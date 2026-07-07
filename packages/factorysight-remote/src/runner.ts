@@ -1,7 +1,7 @@
 import path from "node:path"
 import { spawn } from "node:child_process"
 import { appendEvent, createTask, getState, patchTask, setTaskStatus } from "./store"
-import type { Task } from "./shared"
+import { defaultAgents, type Task } from "./shared"
 import {
   adaptiveOrchestrationSteps,
   childPrompt,
@@ -232,11 +232,18 @@ async function appendAdaptiveChildren(
 ) {
   const state = await getState()
   const currentChildren = state.tasks.filter((task) => task.parentTaskId === parent.id)
+  const completedOutput = completed.events
+    .filter((event) => ["deliverable", "runner", "error", "handoff", "system"].includes(event.type))
+    .slice(-20)
+    .map((event) => event.text)
+    .join("\n")
   const steps = adaptiveOrchestrationSteps({
     prompt: parent.prompt,
     scale,
     completedAgent: completed.agent,
     existingAgents: currentChildren.map((task) => task.agent),
+    completedOutput,
+    availableAgents: defaultAgents,
   })
   if (!steps.length) return
 
@@ -273,7 +280,7 @@ async function runTaskChain(parentTaskId: string, taskIds: string[], scale: Orch
     const parent = state.tasks.find((item) => item.id === parentTaskId)
     const task = state.tasks.find((item) => item.id === taskId)
     if (!parent || !task) continue
-    const step = orchestrationStepForTask(parent, task, scale)
+    const step = orchestrationStepForTask(parent, task, scale, defaultAgents)
     const previous =
       index === 0
         ? "orchestrator"
@@ -326,7 +333,7 @@ async function runTaskChain(parentTaskId: string, taskIds: string[], scale: Orch
       type: "system",
       text: `Completed ${task.agent}: ${task.title}`,
     })
-    await appendAdaptiveChildren(parent, task, taskIds, index, scale)
+    await appendAdaptiveChildren(parent, updated ?? task, taskIds, index, scale)
   }
   await setTaskStatus(parentTaskId, "completed", "Orchestration chain completed")
 }

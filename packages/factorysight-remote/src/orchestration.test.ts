@@ -1,5 +1,12 @@
 import { expect, test } from "bun:test"
-import { adaptiveOrchestrationSteps, handoffText, initialOrchestrationPlan, orchestrationPlan } from "./orchestration"
+import {
+  adaptiveOrchestrationSteps,
+  childPrompt,
+  handoffText,
+  initialOrchestrationPlan,
+  orchestrationPlan,
+} from "./orchestration"
+import type { Task } from "./shared"
 
 test("orchestrationPlan starts with a primary planning step before specialist roles", () => {
   const plan = orchestrationPlan("Build a responsive web app with backend auth", "balanced")
@@ -61,4 +68,51 @@ test("handoffText summarizes agent handshake state", () => {
   expect(handoffText({ from: "orchestrator", to: step.agent, step, status: "offered" })).toContain(
     "Agent handoff offered: orchestrator -> plan",
   )
+})
+
+test("orchestrationPlan only dispatches agents from the backend roster when provided", () => {
+  const plan = orchestrationPlan("Build a frontend and backend workflow", "wide", ["plan", "build", "qa-engineer"])
+
+  expect(plan.every((step) => ["plan", "build", "qa-engineer"].includes(step.agent))).toBe(true)
+  expect(plan.map((step) => step.title)).toContain("Plan orchestration sequence")
+})
+
+test("adaptiveOrchestrationSteps reacts to completed output signals", () => {
+  const steps = adaptiveOrchestrationSteps({
+    prompt: "Build project intake workflow",
+    scale: "wide",
+    completedAgent: "build",
+    existingAgents: ["plan", "product-lead", "tech-lead", "build"],
+    completedOutput: "The implementation introduced OAuth tokens and permission handling that need security review.",
+    availableAgents: ["plan", "build", "security-reviewer", "qa-engineer"],
+  })
+
+  expect(steps.some((step) => step.agent === "security-reviewer")).toBe(true)
+})
+
+test("childPrompt includes four-step workflow methodology and JSON handoff contract", () => {
+  const [step] = orchestrationPlan("Build backend API", "balanced")
+  if (!step) throw new Error("expected a plan step")
+  const parent: Task = {
+    id: "tsk_parent",
+    projectId: "prj_1",
+    creatorId: "usr_1",
+    kind: "orchestration",
+    title: "Parent",
+    prompt: "Build backend API",
+    agent: "orchestrator",
+    model: "anthropic/claude-opus-4-8",
+    status: "queued",
+    collaboration: "project",
+    createdAt: "2026-07-07T00:00:00.000Z",
+    updatedAt: "2026-07-07T00:00:00.000Z",
+    events: [],
+  }
+
+  const prompt = childPrompt(parent, step)
+
+  expect(prompt).toContain("Decompose the objective")
+  expect(prompt).toContain("```json")
+  expect(prompt).toContain('"execution"')
+  expect(prompt).toContain("uncertainty/conflict")
 })
