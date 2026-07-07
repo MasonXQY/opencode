@@ -1191,43 +1191,37 @@ function WorkflowCanvas(props: {
 
   createEffect(() => {
     props.selectedTaskId
-    focusSelectedNode()
+    if (props.selectedTask) focusSelectedNode()
   })
+
+  const hasWorkflow = createMemo(() => Boolean(props.project && props.tasks.length))
 
   return (
     <section class="workflow-canvas">
       <div class="canvas-grid" aria-hidden="true" />
       <div class="canvas-toolstrip">
-        <button type="button" class="secondary" onClick={props.onRefresh}>
-          Agent prompts
-        </button>
         <button type="button" class="secondary" onClick={props.onStartWorkflow}>
           New node
         </button>
+        <button
+          class="secondary"
+          disabled={!workflowRootTask() || Boolean(nodeActionBusy())}
+          onClick={runWorkflowAgain}
+        >
+          Run workflow again
+        </button>
+        <button type="button" class="secondary" onClick={props.onRefresh}>
+          Sync
+        </button>
       </div>
       <div class="workflow-header">
-        <div>
-          <span class="eyebrow">Project workflow</span>
-          <h1>{props.project?.name ?? "Create a project to start"}</h1>
-          <p>
-            {props.selectedTask
-              ? `Current run: ${props.selectedTask.title}`
-              : (props.project?.path ?? "FactorySight Remote is ready for a workspace.")}
-          </p>
-        </div>
-        <div class="run-controls">
-          <button class="secondary" onClick={props.onRefresh}>
-            Sync status
-          </button>
-          <button
-            class="secondary"
-            disabled={!workflowRootTask() || Boolean(nodeActionBusy())}
-            onClick={runWorkflowAgain}
-          >
-            Run workflow again
-          </button>
-          <button onClick={props.onStartWorkflow}>Add requirement</button>
-        </div>
+        <span class="eyebrow">{hasWorkflow() ? "Adaptive workflow" : "Canvas ready"}</span>
+        <h1>{props.project?.name ?? "Create a project to start"}</h1>
+        <p>
+          {props.selectedTask
+            ? `Current run: ${props.selectedTask.title}`
+            : (props.project?.path ?? "FactorySight Remote is ready for a workspace.")}
+        </p>
       </div>
       <div class="canvas-toolbar">
         <div class="canvas-progress">
@@ -1255,40 +1249,54 @@ function WorkflowCanvas(props: {
           </button>
         </div>
       </div>
-      <div class="node-viewport" ref={nodeViewport} onWheel={handleViewportWheel}>
-        <div
-          class="node-flow graph-flow"
-          style={{ "--canvas-zoom": zoom(), width: `${flow().width}px`, height: `${flow().height}px` }}
-        >
-          <FlowEdges edges={flow().edges} width={flow().width} height={flow().height} />
-          <For each={flow().nodes}>
-            {(node, index) => (
-              <FlowNodeCard
-                data={props.data}
-                node={node}
-                index={index() + 1}
-                selected={node.taskId === props.selectedTaskId}
-                zoom={zoom()}
-                actionBusy={nodeActionBusy()}
-                onSelect={() => node.taskId && props.onSelectTask(node.taskId)}
-                onMove={moveNode}
-                onRunAgain={runNodeAgain}
-                onDuplicate={duplicateNode}
-                onDelete={deleteNode}
-              />
-            )}
-          </For>
+      <Show
+        when={hasWorkflow()}
+        fallback={<CanvasEmpty project={props.project} onStartWorkflow={props.onStartWorkflow} />}
+      >
+        <div class="node-viewport" ref={nodeViewport} onWheel={handleViewportWheel}>
+          <div
+            class="node-flow graph-flow"
+            style={{ "--canvas-zoom": zoom(), width: `${flow().width}px`, height: `${flow().height}px` }}
+          >
+            <FlowEdges edges={flow().edges} width={flow().width} height={flow().height} />
+            <For each={flow().nodes}>
+              {(node, index) => (
+                <FlowNodeCard
+                  data={props.data}
+                  node={node}
+                  index={index() + 1}
+                  selected={node.taskId === props.selectedTaskId}
+                  zoom={zoom()}
+                  actionBusy={nodeActionBusy()}
+                  onSelect={() => node.taskId && props.onSelectTask(node.taskId)}
+                  onMove={moveNode}
+                  onRunAgain={runNodeAgain}
+                  onDuplicate={duplicateNode}
+                  onDelete={deleteNode}
+                />
+              )}
+            </For>
+          </div>
         </div>
-      </div>
+      </Show>
     </section>
   )
 }
 
-function CanvasEmpty() {
+function CanvasEmpty(props: { project: Project | undefined; onStartWorkflow: () => void }) {
   return (
     <div class="canvas-empty">
-      <strong>No workflow yet</strong>
-      <span>Enter a requirement below and FactorySight will create the agent chain for this project.</span>
+      <strong>{props.project ? "No workflow in this project" : "No project selected"}</strong>
+      <span>
+        {props.project
+          ? "Start with a requirement. FactorySight will create the first workflow nodes here."
+          : "Create or select a project to start with a blank canvas."}
+      </span>
+      <Show when={props.project}>
+        <button type="button" onClick={props.onStartWorkflow}>
+          Add requirement
+        </button>
+      </Show>
     </div>
   )
 }

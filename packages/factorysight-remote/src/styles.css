@@ -378,7 +378,6 @@ label {
 
 .library-title,
 .panel-heading,
-.workflow-header,
 .inspector-top,
 .canvas-footer,
 .run-controls,
@@ -665,16 +664,20 @@ label {
 .workflow-header {
   position: absolute;
   z-index: 3;
-  top: 64px;
+  top: 56px;
   left: 50%;
-  width: max-content;
-  max-width: min(620px, calc(100vw - 120px));
-  padding: 8px 10px;
+  max-width: min(560px, calc(100vw - 160px));
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 8px 12px;
   border: 1px solid var(--line);
   border-radius: 3px;
-  background: rgb(255 255 255 / 0.9);
+  background: rgb(255 255 255 / 0.82);
   box-shadow: none;
+  text-align: center;
   transform: translateX(-50%);
+  backdrop-filter: blur(10px);
 }
 
 .workflow-header h1,
@@ -711,11 +714,16 @@ label {
 .canvas-toolstrip {
   position: absolute;
   z-index: 3;
-  top: 14px;
-  left: 14px;
+  top: 12px;
+  left: 12px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: rgb(255 255 255 / 0.86);
+  backdrop-filter: blur(10px);
 }
 
 .canvas-toolstrip button {
@@ -1143,21 +1151,28 @@ label {
 
 .canvas-empty {
   place-self: center;
-  width: min(420px, 100%);
+  width: min(360px, calc(100% - 32px));
   display: grid;
   justify-items: center;
-  gap: 8px;
-  padding: 28px;
+  gap: 10px;
+  padding: 22px 24px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: rgb(255 255 255 / 0.86);
+  border-radius: 3px;
+  background: rgb(255 255 255 / 0.76);
   color: var(--muted);
   text-align: center;
+  backdrop-filter: blur(10px);
 }
 
 .canvas-empty strong {
   color: var(--text);
-  font-size: 18px;
+  font-size: 15px;
+}
+
+.canvas-empty span {
+  max-width: 280px;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .canvas-footer {
@@ -1791,12 +1806,9 @@ label {
 
 @media (max-width: 760px) {
   .workflow-header {
-    align-items: stretch;
-    border-radius: var(--radius-lg);
     max-width: calc(100vw - 28px);
   }
 
-  .workflow-header,
   .canvas-footer {
     display: grid;
   }
@@ -1826,14 +1838,14 @@ label {
   }
 
   .canvas-toolbar {
-    grid-template-columns: 1fr;
-    justify-content: stretch;
-    top: 8px;
+    justify-content: end;
+    top: auto;
     right: 8px;
+    bottom: 8px;
   }
 
   .canvas-zoom {
-    justify-self: start;
+    justify-self: end;
   }
 
   .mission-bar {
