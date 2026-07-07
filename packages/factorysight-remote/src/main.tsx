@@ -1065,6 +1065,12 @@ function WorkflowCanvas(props: {
           model: task.model,
           collaboration: task.collaboration,
         })
+  const workflowRootTask = () => {
+    const selected = props.selectedTask
+    if (!selected) return props.chainTasks.find((task) => task.kind === "orchestration") ?? props.chainTasks[0]
+    if (selected.kind === "orchestration") return selected
+    return props.tasks.find((task) => task.id === selected.parentTaskId) ?? selected
+  }
   const duplicateNode = async (node: FlowNode) => {
     if (!node.taskId) return
     const task = taskById().get(node.taskId)
@@ -1086,7 +1092,24 @@ function WorkflowCanvas(props: {
     if (!task) return
     setNodeActionBusy(`rerun:${node.id}`)
     try {
-      const created = await createRunFromTask(task, `${task.title} rerun`)
+      await createRunFromTask(task, `${task.title} rerun`)
+      await props.onRefresh()
+      props.onSelectTask(node.taskId)
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : String(error))
+    } finally {
+      setNodeActionBusy(undefined)
+    }
+  }
+  const runWorkflowAgain = async () => {
+    const task = workflowRootTask()
+    if (!task) {
+      props.onStartWorkflow()
+      return
+    }
+    setNodeActionBusy(`workflow:${task.id}`)
+    try {
+      const created = await createRunFromTask(task, `${task.title} workflow rerun`)
       await props.onRefresh()
       props.onSelectTask(created.id)
     } catch (error) {
@@ -1170,6 +1193,13 @@ function WorkflowCanvas(props: {
         <div class="run-controls">
           <button class="secondary" onClick={props.onRefresh}>
             Sync status
+          </button>
+          <button
+            class="secondary"
+            disabled={!workflowRootTask() || Boolean(nodeActionBusy())}
+            onClick={runWorkflowAgain}
+          >
+            Run workflow again
           </button>
           <button onClick={props.onStartWorkflow}>Add requirement</button>
         </div>
