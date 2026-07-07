@@ -57,9 +57,12 @@ export type FileAttachment = {
 
 export type GmailStatus = {
   connected: boolean
+  configured?: boolean
   email?: string
   scope?: string
   updatedAt?: string
+  redirectUri?: string
+  missingConfig?: string[]
 }
 
 export type GmailImportPayload = {

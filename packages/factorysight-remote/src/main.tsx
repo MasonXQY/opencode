@@ -1052,16 +1052,32 @@ function ProjectFiles(props: {
         <div>
           <strong>Gmail input</strong>
           <small>
-            {gmailStatus().connected
-              ? `Connected${gmailStatus().email ? ` as ${gmailStatus().email}` : ""}`
-              : "Connect Gmail to import messages as project data."}
+            {gmailStatus().configured === false
+              ? `Setup required: ${gmailStatus().missingConfig?.join(", ") || "Google OAuth config"}`
+              : gmailStatus().connected
+                ? `Connected${gmailStatus().email ? ` as ${gmailStatus().email}` : ""}`
+                : "Connect Gmail to import messages as project data."}
           </small>
+          <Show when={gmailStatus().configured === false && gmailStatus().redirectUri}>
+            <small>Redirect URI: {gmailStatus().redirectUri}</small>
+          </Show>
         </div>
         <Show
           when={gmailStatus().connected}
           fallback={
-            <button type="button" class="secondary" disabled={gmailBusy()} onClick={connectGmail}>
-              {gmailConnecting() ? "Waiting for Gmail..." : gmailBusy() ? "Opening..." : "Connect Gmail"}
+            <button
+              type="button"
+              class="secondary"
+              disabled={gmailBusy() || gmailStatus().configured === false}
+              onClick={connectGmail}
+            >
+              {gmailStatus().configured === false
+                ? "Gmail setup required"
+                : gmailConnecting()
+                  ? "Waiting for Gmail..."
+                  : gmailBusy()
+                    ? "Opening..."
+                    : "Connect Gmail"}
             </button>
           }
         >

@@ -43,7 +43,23 @@ export function gmailRedirectUri() {
   return process.env.FACTORYSIGHT_GMAIL_REDIRECT_URI ?? "http://localhost:3090/api/integrations/gmail/callback"
 }
 
+export function gmailSetupStatus() {
+  const required = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]
+  const missing = required.filter((name) => !process.env[name])
+  return {
+    configured: missing.length === 0,
+    missingConfig: missing,
+    redirectUri: gmailRedirectUri(),
+  }
+}
+
 export async function gmailAuthorizationUrl(userId: string) {
+  const setup = gmailSetupStatus()
+  if (!setup.configured) {
+    throw new Error(
+      `Gmail setup required: set ${setup.missingConfig.join(", ")} and add redirect URI ${setup.redirectUri} in Google Cloud OAuth.`,
+    )
+  }
   const state = await createGmailOAuthState(userId)
   const url = new URL(googleAuthUrl)
   url.searchParams.set("client_id", requiredEnv("GOOGLE_CLIENT_ID"))

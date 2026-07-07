@@ -30,3 +30,14 @@ test("gmailAuthorizationUrl requests readonly Gmail access with backend callback
   expect(url.searchParams.get("access_type")).toBe("offline")
   expect(url.searchParams.get("state")).toBeTruthy()
 })
+
+test("gmailSetupStatus reports missing backend OAuth configuration", async () => {
+  process.env.FACTORYSIGHT_GMAIL_REDIRECT_URI = "http://localhost:3090/api/integrations/gmail/callback"
+  const { gmailSetupStatus } = await import(`./gmail-client.ts?setup=${Date.now()}`)
+
+  expect(gmailSetupStatus()).toEqual({
+    configured: false,
+    missingConfig: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
+    redirectUri: "http://localhost:3090/api/integrations/gmail/callback",
+  })
+})

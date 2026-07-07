@@ -34,7 +34,12 @@ import { childPrompt, initialOrchestrationPlan } from "./orchestration"
 import { permissionProfiles, type Artifact, type Project, type Task, type User } from "./shared"
 import { listProjectFiles, saveUploadedFile } from "./file-storage"
 import { listProjectArtifacts, writeTaskDeliverableArtifact } from "./artifact-storage"
-import { completeGmailAuthorization, gmailAuthorizationUrl, importGmailMessages } from "./gmail-client"
+import {
+  completeGmailAuthorization,
+  gmailAuthorizationUrl,
+  gmailSetupStatus,
+  importGmailMessages,
+} from "./gmail-client"
 import { clearGmailToken, gmailStatus } from "./gmail-storage"
 
 export const app = new Hono<{ Variables: { user: User } }>()
@@ -260,17 +265,21 @@ app.get("/api/app/bootstrap", async (c) => {
     agentProfiles: agents.agentProfiles,
     models: await backendModels(),
     backendMode: remoteBackendMode(),
-    gmail: await gmailStatus(user.id),
+    gmail: { ...(await gmailStatus(user.id)), ...gmailSetupStatus() },
     permissionProfiles,
   })
 })
 
 app.get("/api/integrations/gmail/status", async (c) => {
-  return c.json(await gmailStatus(c.get("user").id))
+  return c.json({ ...(await gmailStatus(c.get("user").id)), ...gmailSetupStatus() })
 })
 
 app.post("/api/integrations/gmail/connect", async (c) => {
-  return c.json({ url: await gmailAuthorizationUrl(c.get("user").id) })
+  try {
+    return c.json({ url: await gmailAuthorizationUrl(c.get("user").id) })
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 400)
+  }
 })
 
 app.get("/api/integrations/gmail/callback", async (c) => {
