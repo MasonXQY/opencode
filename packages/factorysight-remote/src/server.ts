@@ -68,6 +68,8 @@ const createOrchestrationSchema = z.object({
   model: z.string().min(1),
   collaboration: z.enum(["private", "project", "shared"]).default("project"),
   scale: z.enum(["focused", "balanced", "wide"]).default("balanced"),
+  intent: z.enum(["create", "modify"]).default("create"),
+  parentTaskId: z.string().optional(),
 })
 const addMessageSchema = z.object({ text: z.string().min(1) })
 const updateTaskSchema = z.object({
@@ -189,6 +191,8 @@ async function parseCreateOrchestration(c: any) {
       model: formString(form, "model"),
       collaboration: formString(form, "collaboration", "project"),
       scale: formString(form, "scale", "balanced"),
+      intent: formString(form, "intent", "create"),
+      parentTaskId: formString(form, "parentTaskId") || undefined,
     }),
     files,
   }
@@ -402,6 +406,55 @@ app.post("/api/orchestrations", async (c) => {
   const { body, files } = await parseCreateOrchestration(c)
   const project = await visibleProject(body.projectId, user.id)
   if (!project) return c.json({ error: "project not found" }, 404)
+
+  if (body.intent === "modify") {
+    const tasks = await visibleTasks(user.id)
+    const parent =
+      (body.parentTaskId ? tasks.find((task) => task.id === body.parentTaskId) : undefined) ??
+      tasks.find((task) => task.projectId === body.projectId && task.kind === "orchestration")
+    if (!parent || parent.projectId !== body.projectId) return c.json({ error: "workflow not found" }, 404)
+
+    await attachFiles(project, parent, files, user.id)
+    await appendEvent(parent.id, {
+      type: "message",
+      authorId: user.id,
+      text: `Workflow change requested: ${body.prompt}`,
+    })
+
+    const steps = initialOrchestrationPlan(body.prompt, body.scale)
+    const children: Task[] = []
+    const parentContext = { ...parent, title: body.title, prompt: body.prompt }
+    for (const step of steps) {
+      const child = await createTask({
+        creatorId: user.id,
+        projectId: body.projectId,
+        parentTaskId: parent.id,
+        title: step.title,
+        prompt: childPrompt(parentContext, step),
+        agent: step.agent,
+        model: body.model,
+        collaboration: body.collaboration,
+        kind: "single",
+      })
+      children.push(child)
+      await appendEvent(parent.id, {
+        type: "system",
+        text: `Queued workflow update ${step.phase} phase role ${step.agent}: ${step.title}`,
+      })
+    }
+
+    const existingChildIds =
+      parent.childTaskIds ?? tasks.filter((task) => task.parentTaskId === parent.id).map((task) => task.id)
+    await patchTask(parent.id, { childTaskIds: [...existingChildIds, ...children.map((child) => child.id)] })
+    await appendEvent(parent.id, {
+      type: "system",
+      text: `FactorySight queued ${children.length} workflow update steps. The topology will continue adapting as these nodes run.`,
+    })
+    enqueueBackendTaskChain(parent.id, children, body.scale)
+    return c.json(
+      children[0] ?? { ...parent, childTaskIds: [...existingChildIds, ...children.map((child) => child.id)] },
+    )
+  }
 
   let parent = await createTask({
     creatorId: user.id,

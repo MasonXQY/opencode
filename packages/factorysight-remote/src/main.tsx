@@ -378,6 +378,30 @@ function productPrompt(input: { prompt: string; style: ProductStyleId; notes: st
     .join("\n")
 }
 
+function workflowModificationPrompt(input: {
+  prompt: string
+  workflowTasks: Task[]
+  style: ProductStyleId
+  notes: string
+}) {
+  const topology = input.workflowTasks.length
+    ? input.workflowTasks
+        .map((task, index) => `${index + 1}. ${task.title} | ${task.agent} | ${task.status}`)
+        .join("\n")
+    : "No existing workflow nodes."
+  return [
+    productPrompt({ prompt: input.prompt, style: input.style, notes: input.notes }),
+    "",
+    "FactorySight workflow update:",
+    "- Modify the existing workflow topology instead of creating a separate project or task layer.",
+    "- Add, remove, reorder, or specialize nodes only when the user's requested change requires it.",
+    "- Preserve useful existing artifacts, uploaded files, and completed work unless the user explicitly asks to replace them.",
+    "",
+    "Current workflow nodes:",
+    topology,
+  ].join("\n")
+}
+
 function App() {
   const [token, setToken] = createSignal(localStorage.getItem(tokenKey) ?? undefined)
   const api = new ApiClient(token())
@@ -526,6 +550,9 @@ function CanvasWorkspace(props: {
   const activeFiles = createMemo(() =>
     props.data.files.filter((file) => file.projectId === activeProjectId() && file.scope === "project"),
   )
+  const workflowRoot = createMemo(
+    () => chainTasks()[0] ?? projectTasks().find((task) => task.kind === "orchestration") ?? projectTasks()[0],
+  )
 
   createEffect(() => {
     if (pendingProjectId()) return
@@ -648,6 +675,8 @@ function CanvasWorkspace(props: {
         data={props.data}
         api={props.api}
         project={activeProject()}
+        workflowRoot={workflowRoot()}
+        workflowTasks={chainTasks().length ? chainTasks() : projectTasks()}
         focusRequest={composerFocusRequest()}
         collapsed={composerCollapsed()}
         onCollapsedChange={setComposerCollapsed}
@@ -1850,6 +1879,8 @@ function MissionCommandBar(props: {
   data: BootstrapData
   api: ApiClient
   project: Project | undefined
+  workflowRoot: Task | undefined
+  workflowTasks: Task[]
   focusRequest: number
   collapsed: boolean
   onCollapsedChange: (collapsed: boolean) => void
@@ -1873,6 +1904,7 @@ function MissionCommandBar(props: {
   const [listening, setListening] = createSignal(false)
   const [voiceError, setVoiceError] = createSignal("")
   const [submitError, setSubmitError] = createSignal("")
+  const updatesExistingWorkflow = createMemo(() => Boolean(props.workflowRoot && props.workflowTasks.length))
   let recognition: SpeechRecognitionLike | undefined
   const speechCtor = () => {
     const speechWindow = window as Window &
@@ -1970,17 +2002,27 @@ function MissionCommandBar(props: {
             setBusy(true)
             setSubmitError("")
             try {
-              const payloadPrompt = productPrompt({ prompt: prompt(), style: style(), notes: notes() })
+              const isWorkflowUpdate = updatesExistingWorkflow() && mode() === "swarm"
+              const payloadPrompt = isWorkflowUpdate
+                ? workflowModificationPrompt({
+                    prompt: prompt(),
+                    workflowTasks: props.workflowTasks,
+                    style: style(),
+                    notes: notes(),
+                  })
+                : productPrompt({ prompt: prompt(), style: style(), notes: notes() })
               const generatedTitle = taskTitleFromPrompt(prompt())
               const task =
                 mode() === "swarm"
                   ? await props.api.createOrchestration({
                       projectId: props.project.id,
-                      title: generatedTitle,
+                      title: isWorkflowUpdate ? `Update workflow: ${generatedTitle}` : generatedTitle,
                       prompt: payloadPrompt,
                       model: model(),
                       collaboration: "project",
                       scale: scale(),
+                      intent: isWorkflowUpdate ? "modify" : "create",
+                      parentTaskId: isWorkflowUpdate ? props.workflowRoot?.id : undefined,
                       files: files(),
                     })
                   : await props.api.createTask({
@@ -2003,7 +2045,7 @@ function MissionCommandBar(props: {
           }}
         >
           <div class="mission-input">
-            <span>Requirement</span>
+            <span>{updatesExistingWorkflow() ? "Workflow change" : "Requirement"}</span>
             <button
               type="button"
               class="composer-minimize"
@@ -2016,7 +2058,11 @@ function MissionCommandBar(props: {
               ref={promptInput}
               value={prompt()}
               onInput={(event) => setPrompt(event.currentTarget.value)}
-              placeholder="Describe what this project needs next. FactorySight will plan and run the workflow automatically..."
+              placeholder={
+                updatesExistingWorkflow()
+                  ? "Describe how the workflow should change. FactorySight will update the topology and run the needed nodes..."
+                  : "Describe what this project needs. FactorySight will plan and run the workflow automatically..."
+              }
             />
             <div class="voice-tools">
               <button
@@ -2044,7 +2090,11 @@ function MissionCommandBar(props: {
                 Config
               </button>
               <button disabled={!props.project || !prompt().trim() || busy()}>
-                {busy() ? "Launching..." : "Launch"}
+                {busy()
+                  ? "Launching..."
+                  : updatesExistingWorkflow() && mode() === "swarm"
+                    ? "Update workflow"
+                    : "Launch"}
               </button>
             </div>
           </div>

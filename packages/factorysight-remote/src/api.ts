@@ -120,6 +120,8 @@ export class ApiClient {
       body.set("model", payload.model)
       body.set("collaboration", payload.collaboration)
       body.set("scale", payload.scale ?? "balanced")
+      if (payload.intent) body.set("intent", payload.intent)
+      if (payload.parentTaskId) body.set("parentTaskId", payload.parentTaskId)
       for (const file of payload.files) body.append("files", file)
       return this.request<Task>("/api/orchestrations", { method: "POST", body })
     }

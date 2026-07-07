@@ -132,6 +132,8 @@ export type CreateOrchestrationPayload = {
   model: string
   collaboration: Task["collaboration"]
   scale?: "focused" | "balanced" | "wide"
+  intent?: "create" | "modify"
+  parentTaskId?: string
 }
 
 export type AddMessagePayload = {
