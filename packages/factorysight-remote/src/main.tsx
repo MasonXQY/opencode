@@ -1438,7 +1438,7 @@ function WorkflowCanvas(props: {
             Fit
           </button>
           <button type="button" class="secondary" onClick={autoLayout}>
-            Auto layout
+            Auto
           </button>
           <button type="button" class="secondary" onClick={focusSelectedNode}>
             Focus

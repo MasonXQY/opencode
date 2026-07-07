@@ -51,8 +51,8 @@ select {
 }
 
 button {
-  min-height: 38px;
-  padding: 9px 14px;
+  min-height: 36px;
+  padding: 8px 13px;
   border: 1px solid var(--accent);
   border-radius: 3px;
   background: var(--accent);
@@ -69,7 +69,7 @@ button {
 
 button:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 10px 24px rgb(24 25 27 / 0.13);
+  box-shadow: 0 8px 18px rgb(24 25 27 / 0.11);
 }
 
 button:disabled {
@@ -188,9 +188,9 @@ label {
 }
 
 .fs-app {
-  width: min(1660px, calc(100vw - 32px));
-  height: calc(100vh - 32px);
-  margin: 16px auto;
+  width: min(1680px, calc(100vw - 24px));
+  height: calc(100vh - 24px);
+  margin: 12px auto;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
@@ -201,12 +201,12 @@ label {
 }
 
 .topbar {
-  min-height: 36px;
+  min-height: 50px;
   display: grid;
-  grid-template-columns: minmax(260px, auto) minmax(180px, 1fr) auto;
+  grid-template-columns: minmax(250px, 0.95fr) minmax(230px, auto) minmax(0, 1.35fr);
   align-items: center;
-  gap: 10px;
-  padding: 5px 9px;
+  gap: 12px;
+  padding: 7px 12px;
   border-bottom: 1px solid var(--line);
   background: var(--surface);
 }
@@ -269,8 +269,8 @@ label {
   min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  justify-content: start;
+  gap: 6px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 760;
@@ -284,6 +284,7 @@ label {
   border: 1px solid var(--line);
   border-radius: 3px;
   background: var(--surface);
+  white-space: nowrap;
 }
 
 .run-status .alert {
@@ -292,10 +293,11 @@ label {
 }
 
 .top-actions {
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: end;
-  gap: 10px;
+  gap: 8px;
 }
 
 .top-panel-controls,
@@ -306,11 +308,15 @@ label {
   gap: 6px;
 }
 
+.top-system-controls {
+  justify-content: end;
+}
+
 .top-panel-controls {
   padding: 3px;
   border: 1px solid var(--line);
   border-radius: 3px;
-  background: rgb(255 255 255 / 0.7);
+  background: rgb(255 255 255 / 0.8);
 }
 
 .top-panel-controls > button {
@@ -354,7 +360,7 @@ label {
 }
 
 .permission-control {
-  width: 210px;
+  width: clamp(168px, 16vw, 210px);
   display: grid;
   grid-template-columns: 1fr;
 }
@@ -375,16 +381,16 @@ label {
   position: absolute;
   z-index: 6;
   top: 14px;
-  bottom: 104px;
+  bottom: 118px;
   min-height: 0;
   display: grid;
   align-content: start;
   gap: 12px;
-  width: min(340px, calc(100vw - 40px));
-  padding: 14px;
+  width: min(320px, calc(100vw - 40px));
+  padding: 12px;
   overflow: auto;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 10px;
   background: rgb(247 247 245 / 0.96);
   box-shadow: 0 18px 60px rgb(24 25 27 / 0.14);
   backdrop-filter: blur(14px);
@@ -411,7 +417,7 @@ label {
 }
 
 .library-title strong {
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .library-tabs {
@@ -726,15 +732,15 @@ label {
 .workflow-header {
   position: absolute;
   z-index: 3;
-  top: 12px;
+  top: 14px;
   left: 50%;
-  max-width: min(480px, 32vw);
-  min-width: 260px;
+  max-width: min(420px, 28vw);
+  min-width: 220px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 6px 12px;
+  padding: 5px 10px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: rgb(255 255 255 / 0.76);
@@ -751,7 +757,7 @@ label {
 
 .workflow-header h1 {
   flex: 0 1 auto;
-  max-width: 140px;
+  max-width: 120px;
   overflow: hidden;
   font-size: 12px;
   line-height: 1.2;
@@ -761,7 +767,7 @@ label {
 
 .workflow-header p {
   flex: 1 1 auto;
-  max-width: 280px;
+  max-width: 230px;
   overflow: hidden;
   color: var(--muted);
   font-size: 11px;
@@ -781,8 +787,8 @@ label {
 .canvas-toolstrip {
   position: absolute;
   z-index: 3;
-  top: 12px;
-  left: 12px;
+  top: 14px;
+  left: 14px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -806,8 +812,8 @@ label {
 .canvas-toolbar {
   position: absolute;
   z-index: 3;
-  top: 12px;
-  right: 12px;
+  top: 14px;
+  right: 14px;
   display: grid;
   grid-template-columns: auto;
   align-items: center;
@@ -842,7 +848,7 @@ label {
   display: inline-flex;
   align-items: center;
   justify-self: end;
-  gap: 4px;
+  gap: 3px;
   padding: 4px;
   border: 1px solid var(--line);
   border-radius: 3px;
@@ -851,7 +857,7 @@ label {
 }
 
 .canvas-zoom button {
-  min-width: 32px;
+  min-width: 30px;
   min-height: 28px;
   padding: 4px 8px;
   border-radius: 2px;
@@ -965,7 +971,7 @@ label {
   background: white;
   color: var(--text);
   text-align: left;
-  box-shadow: 0 10px 20px rgb(24 25 27 / 0.035);
+  box-shadow: 0 8px 18px rgb(24 25 27 / 0.035);
   cursor: grab;
   user-select: none;
 }
@@ -1685,8 +1691,8 @@ label {
   position: absolute;
   z-index: 7;
   left: 50%;
-  bottom: 20px;
-  width: min(1160px, calc(100% - 96px));
+  bottom: 18px;
+  width: min(1040px, calc(100% - 112px));
   min-width: 0;
   padding: 0;
   border: 0;
@@ -1702,19 +1708,19 @@ label {
 .mission-bar form {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 7px;
-  padding: 8px;
+  gap: 8px;
+  padding: 9px;
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: 12px;
   background: rgb(255 255 255 / 0.92);
-  box-shadow: 0 16px 50px rgb(24 25 27 / 0.11);
+  box-shadow: 0 14px 42px rgb(24 25 27 / 0.1);
 }
 
 .mission-input {
   min-width: 0;
   display: grid;
-  grid-template-columns: 34px minmax(260px, 1fr) auto;
-  gap: 7px;
+  grid-template-columns: 34px minmax(320px, 1fr) auto;
+  gap: 8px;
   align-items: center;
 }
 
@@ -1723,10 +1729,10 @@ label {
 }
 
 .mission-input textarea {
-  min-height: 46px;
-  max-height: 78px;
+  min-height: 44px;
+  max-height: 92px;
   grid-column: 2;
-  border-radius: 7px;
+  border-radius: 9px;
   background: rgb(255 255 255 / 0.9);
   resize: none;
 }
@@ -1795,14 +1801,14 @@ label {
   grid-column: 3;
   grid-row: 1;
   display: grid;
-  grid-template-columns: 82px 82px minmax(132px, auto);
-  gap: 7px;
+  grid-template-columns: 76px 78px minmax(122px, auto);
+  gap: 6px;
   align-items: center;
 }
 
 .mission-inline-actions button {
-  min-height: 40px;
-  padding-inline: 12px;
+  min-height: 38px;
+  padding-inline: 11px;
 }
 
 .mission-inline-actions button.active {
@@ -1815,13 +1821,13 @@ label {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: calc(100% + 8px);
+  bottom: calc(100% + 10px);
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
-  padding: 10px;
+  padding: 12px;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: 10px;
   background: rgb(255 255 255 / 0.96);
   box-shadow: 0 16px 50px rgb(24 25 27 / 0.12);
 }
@@ -1857,11 +1863,20 @@ label {
   }
 
   .topbar {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
   }
 
-  .run-status,
+  .run-status {
+    grid-column: 1 / -1;
+    order: 3;
+    overflow: auto;
+    padding-bottom: 2px;
+  }
+
   .top-actions {
+    grid-column: 2;
+    grid-row: 1;
     justify-content: start;
     flex-wrap: wrap;
   }
@@ -1871,8 +1886,21 @@ label {
     flex-wrap: wrap;
   }
 
+  .top-system-controls {
+    justify-content: start;
+  }
+
+  .permission-control {
+    width: 180px;
+  }
+
   .fs-stage {
     display: block;
+  }
+
+  .workflow-header {
+    top: 58px;
+    max-width: min(520px, calc(100vw - 320px));
   }
 
   .mission-bar form,
@@ -1901,7 +1929,48 @@ label {
 
 @media (max-width: 760px) {
   .workflow-header {
-    max-width: calc(100vw - 28px);
+    top: 54px;
+    left: 8px;
+    right: 8px;
+    max-width: none;
+    min-width: 0;
+    transform: none;
+  }
+
+  .workflow-header p {
+    display: none;
+  }
+
+  .topbar {
+    grid-template-columns: 1fr;
+  }
+
+  .top-actions {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .top-panel-controls,
+  .top-system-controls {
+    width: 100%;
+  }
+
+  .top-panel-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.3fr;
+  }
+
+  .view-toggle {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .top-system-controls {
+    display: grid;
+    grid-template-columns: 1fr 84px 92px;
+  }
+
+  .permission-control {
+    width: auto;
   }
 
   .canvas-footer {
@@ -1934,9 +2003,14 @@ label {
 
   .canvas-toolbar {
     justify-content: end;
-    top: 8px;
+    top: 98px;
     right: 8px;
     bottom: auto;
+  }
+
+  .canvas-toolstrip {
+    top: 98px;
+    left: 8px;
   }
 
   .canvas-zoom {
@@ -1946,6 +2020,10 @@ label {
   .mission-bar {
     bottom: 8px;
     width: calc(100% - 16px);
+  }
+
+  .mission-bar form {
+    padding: 8px;
   }
 
   .mission-inline-actions {
