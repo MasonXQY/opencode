@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { orchestrationPlan } from "./orchestration"
+import { adaptiveOrchestrationSteps, initialOrchestrationPlan, orchestrationPlan } from "./orchestration"
 
 test("orchestrationPlan starts with a primary planning step before specialist roles", () => {
   const plan = orchestrationPlan("Build a responsive web app with backend auth", "balanced")
@@ -22,4 +22,22 @@ test("orchestrationPlan keeps verification roles after implementation roles", ()
   expect(buildIndex).toBeGreaterThan(0)
   expect(qaIndex).toBeGreaterThan(buildIndex)
   expect(reviewIndex).toBeGreaterThan(qaIndex)
+})
+
+test("initialOrchestrationPlan starts with only the core workflow spine", () => {
+  const plan = initialOrchestrationPlan("Build a responsive web app with backend auth", "wide")
+
+  expect(plan.map((step) => step.agent)).toEqual(["plan", "product-lead", "tech-lead", "build"])
+})
+
+test("adaptiveOrchestrationSteps adds demand-specific roles while running", () => {
+  const steps = adaptiveOrchestrationSteps({
+    prompt: "Build a responsive web app with backend auth",
+    scale: "wide",
+    completedAgent: "tech-lead",
+    existingAgents: ["plan", "product-lead", "tech-lead", "build"],
+  })
+
+  expect(steps.some((step) => step.agent === "frontend-engineer")).toBe(true)
+  expect(steps.some((step) => step.agent === "backend-engineer")).toBe(true)
 })

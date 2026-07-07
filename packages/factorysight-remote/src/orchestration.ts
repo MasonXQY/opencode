@@ -126,6 +126,30 @@ export function orchestrationPlan(prompt: string, scale: OrchestrationScale): Or
   return unique
 }
 
+export function initialOrchestrationPlan(prompt: string, scale: OrchestrationScale): OrchestrationStep[] {
+  const coreAgents = new Set(["plan", "product-lead", "tech-lead", "build"])
+  return orchestrationPlan(prompt, scale).filter((step) => coreAgents.has(step.agent))
+}
+
+export function adaptiveOrchestrationSteps(input: {
+  prompt: string
+  scale: OrchestrationScale
+  completedAgent: string
+  existingAgents: string[]
+}): OrchestrationStep[] {
+  const existing = new Set(input.existingAgents)
+  const fullPlan = orchestrationPlan(input.prompt, input.scale).filter((step) => !existing.has(step.agent))
+  const take = (phases: OrchestrationPhase[], limit: number) =>
+    fullPlan.filter((step) => phases.includes(step.phase)).slice(0, limit)
+
+  if (input.completedAgent === "plan") return take(["design"], 2)
+  if (["product-lead", "tech-lead", "architect", "ux-designer"].includes(input.completedAgent)) {
+    return take(["build"], 2)
+  }
+  if (input.completedAgent === "build" || input.completedAgent.endsWith("-engineer")) return take(["verify"], 3)
+  return []
+}
+
 export function childPrompt(parent: Task, step: OrchestrationStep, priorContext?: string) {
   return [
     `You are the ${step.agent} role in an autonomous FactorySight orchestration.`,

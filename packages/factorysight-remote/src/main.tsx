@@ -489,7 +489,10 @@ function CanvasWorkspace(props: {
   onRefresh: () => void
   onLogout: () => void
 }) {
-  const newestProjectId = createMemo(() => props.data.projects.at(-1)?.id)
+  const [hiddenProjectIds, setHiddenProjectIds] = createSignal<Set<string>>(new Set())
+  const [pendingProjectId, setPendingProjectId] = createSignal<string | undefined>()
+  const visibleProjects = createMemo(() => props.data.projects.filter((project) => !hiddenProjectIds().has(project.id)))
+  const newestProjectId = createMemo(() => visibleProjects().at(-1)?.id)
   const [activeProjectId, setActiveProjectId] = createSignal(newestProjectId())
   const [libraryTab, setLibraryTab] = createSignal<LibraryTab>("projects")
   const [workspaceView, setWorkspaceView] = createSignal<WorkspaceView>("workflow")
@@ -497,7 +500,7 @@ function CanvasWorkspace(props: {
   const [composerCollapsed, setComposerCollapsed] = createSignal(false)
   const [workspaceDrawerOpen, setWorkspaceDrawerOpen] = createSignal(false)
   const [detailsDrawerOpen, setDetailsDrawerOpen] = createSignal(false)
-  const activeProject = createMemo(() => props.data.projects.find((project) => project.id === activeProjectId()))
+  const activeProject = createMemo(() => visibleProjects().find((project) => project.id === activeProjectId()))
   const projectTasks = createMemo(() =>
     props.data.tasks.filter((task) => task.projectId === activeProjectId() && task.status !== "archived"),
   )
@@ -525,9 +528,11 @@ function CanvasWorkspace(props: {
   )
 
   createEffect(() => {
+    if (pendingProjectId()) return
     const current = activeProjectId()
-    if (current && props.data.projects.some((project) => project.id === current)) return
+    if (current && visibleProjects().some((project) => project.id === current)) return
     setActiveProjectId(newestProjectId())
+    props.onSelectTask(undefined)
   })
 
   createEffect(() => {
@@ -559,9 +564,28 @@ function CanvasWorkspace(props: {
             onTab={setLibraryTab}
             activeProjectId={activeProjectId()}
             onProject={(id) => {
+              setPendingProjectId(undefined)
               setActiveProjectId(id)
               props.onSelectTask(undefined)
               setWorkspaceDrawerOpen(false)
+            }}
+            onProjectCreated={async (id) => {
+              setPendingProjectId(id)
+              setActiveProjectId(id)
+              props.onSelectTask(undefined)
+              setWorkspaceDrawerOpen(false)
+              await props.onRefresh()
+              setPendingProjectId(undefined)
+              setActiveProjectId(id)
+            }}
+            onProjectDeleted={async (id) => {
+              setHiddenProjectIds((current) => new Set([...current, id]))
+              if (activeProjectId() === id) {
+                setPendingProjectId(undefined)
+                setActiveProjectId(undefined)
+                props.onSelectTask(undefined)
+              }
+              await props.onRefresh()
             }}
             files={activeFiles()}
             artifacts={activeArtifacts()}
@@ -763,6 +787,8 @@ function ToolLibrary(props: {
   onTab: (tab: LibraryTab) => void
   activeProjectId: string | undefined
   onProject: (id: string) => void
+  onProjectCreated: (id: string) => void | Promise<void>
+  onProjectDeleted: (id: string) => void | Promise<void>
   files: FileAttachment[]
   artifacts: Artifact[]
   onRefresh: () => void
@@ -791,10 +817,9 @@ function ToolLibrary(props: {
         <ProjectCreator
           data={props.data}
           api={props.api}
-          onCreated={(id) => {
-            props.onProject(id)
+          onCreated={async (id) => {
+            await props.onProjectCreated(id)
             setNewProjectOpen(false)
-            props.onRefresh()
           }}
         />
       </Show>
@@ -814,8 +839,8 @@ function ToolLibrary(props: {
                     onClick={async () => {
                       setBusyProjectId(project.id)
                       await props.api.deleteProject(project.id)
+                      await props.onProjectDeleted(project.id)
                       setBusyProjectId(undefined)
-                      props.onRefresh()
                     }}
                   >
                     Delete

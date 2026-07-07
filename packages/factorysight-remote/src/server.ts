@@ -23,7 +23,7 @@ import {
   visibleTasks,
 } from "./store"
 import { backendModels, backendTasks, enqueueBackendTask, enqueueBackendTaskChain, remoteBackendMode } from "./backend"
-import { childPrompt, orchestrationPlan } from "./orchestration"
+import { childPrompt, initialOrchestrationPlan } from "./orchestration"
 import {
   agentProfiles,
   defaultAgents,
@@ -419,7 +419,7 @@ app.post("/api/orchestrations", async (c) => {
     text: `Autonomous Agent Swarm queued in ${body.scale} mode. Main planning runs first, then specialist roles run in sequence.`,
   })
 
-  const steps = orchestrationPlan(body.prompt, body.scale)
+  const steps = initialOrchestrationPlan(body.prompt, body.scale)
   const children: Task[] = []
   for (const step of steps) {
     const child = await createTask({
@@ -436,16 +436,16 @@ app.post("/api/orchestrations", async (c) => {
     children.push(child)
     await appendEvent(parent.id, {
       type: "system",
-      text: `Queued ${step.phase} phase role ${step.agent}: ${step.title}`,
+      text: `Queued initial ${step.phase} phase role ${step.agent}: ${step.title}`,
     })
   }
 
   await patchTask(parent.id, { childTaskIds: children.map((child) => child.id) })
   await appendEvent(parent.id, {
     type: "system",
-    text: `Orchestrator created ${children.length} ordered steps. Running the main plan step before dispatching specialist work.`,
+    text: `Orchestrator created ${children.length} initial steps. The topology can adapt while the workflow is running.`,
   })
-  enqueueBackendTaskChain(parent.id, children)
+  enqueueBackendTaskChain(parent.id, children, body.scale)
   return c.json({ ...parent, childTaskIds: children.map((child) => child.id) })
 })
 

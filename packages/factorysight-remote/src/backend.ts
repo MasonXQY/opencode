@@ -1,4 +1,5 @@
 import type { Project, Task } from "./shared"
+import type { OrchestrationScale } from "./orchestration"
 import { availableModels as localModels } from "./models"
 import { enqueueTask as enqueueLocalTask, enqueueTaskChain as enqueueLocalTaskChain } from "./runner"
 import {
@@ -36,8 +37,8 @@ export function enqueueBackendTask(task: Task) {
   return remoteBackendMode() === "factorysight" ? enqueueFactorySightTask(task) : enqueueLocalTask(task)
 }
 
-export function enqueueBackendTaskChain(parentTaskId: string, tasks: Task[]) {
+export function enqueueBackendTaskChain(parentTaskId: string, tasks: Task[], scale: OrchestrationScale = "balanced") {
   return remoteBackendMode() === "factorysight"
-    ? enqueueFactorySightTaskChain(parentTaskId, tasks)
-    : enqueueLocalTaskChain(parentTaskId, tasks)
+    ? enqueueFactorySightTaskChain(parentTaskId, tasks, scale)
+    : enqueueLocalTaskChain(parentTaskId, tasks, scale)
 }

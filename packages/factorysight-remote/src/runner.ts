@@ -1,7 +1,8 @@
 import path from "node:path"
 import { spawn } from "node:child_process"
-import { appendEvent, getState, patchTask, setTaskStatus } from "./store"
+import { appendEvent, createTask, getState, patchTask, setTaskStatus } from "./store"
 import type { Task } from "./shared"
+import { adaptiveOrchestrationSteps, childPrompt, type OrchestrationScale } from "./orchestration"
 import { listProjectFiles } from "./file-storage"
 import { runnerAgentFor } from "./agent-routing"
 import { writeTaskDeliverableArtifact } from "./artifact-storage"
@@ -211,17 +212,61 @@ export function enqueueTask(task: Task) {
   void runTask(task.id)
 }
 
-export function enqueueTaskChain(parentTaskId: string, tasks: Task[]) {
+export function enqueueTaskChain(parentTaskId: string, tasks: Task[], scale: OrchestrationScale = "balanced") {
   const taskIds = tasks.map((task) => task.id)
-  void runTaskChain(parentTaskId, taskIds)
+  void runTaskChain(parentTaskId, taskIds, scale)
 }
 
-async function runTaskChain(parentTaskId: string, taskIds: string[]) {
+async function appendAdaptiveChildren(
+  parent: Task,
+  completed: Task,
+  taskIds: string[],
+  insertAfterIndex: number,
+  scale: OrchestrationScale,
+) {
+  const state = await getState()
+  const currentChildren = state.tasks.filter((task) => task.parentTaskId === parent.id)
+  const steps = adaptiveOrchestrationSteps({
+    prompt: parent.prompt,
+    scale,
+    completedAgent: completed.agent,
+    existingAgents: currentChildren.map((task) => task.agent),
+  })
+  if (!steps.length) return
+
+  const created: Task[] = []
+  for (const step of steps) {
+    const child = await createTask({
+      creatorId: parent.creatorId,
+      projectId: parent.projectId,
+      parentTaskId: parent.id,
+      title: step.title,
+      prompt: childPrompt(parent, step),
+      agent: step.agent,
+      model: parent.model,
+      collaboration: parent.collaboration,
+      kind: "single",
+    })
+    created.push(child)
+    await appendEvent(parent.id, {
+      type: "system",
+      text: `Adaptive topology added ${step.phase} role ${step.agent}: ${step.title}`,
+    })
+  }
+  taskIds.splice(insertAfterIndex + 1, 0, ...created.map((task) => task.id))
+  const nextChildren = (parent.childTaskIds ?? taskIds).filter((id) => !created.some((task) => task.id === id))
+  nextChildren.splice(insertAfterIndex + 1, 0, ...created.map((task) => task.id))
+  await patchTask(parent.id, { childTaskIds: nextChildren })
+}
+
+async function runTaskChain(parentTaskId: string, taskIds: string[], scale: OrchestrationScale) {
   await setTaskStatus(parentTaskId, "running", "Main agent planning and dispatch started")
-  for (const taskId of taskIds) {
+  for (let index = 0; index < taskIds.length; index++) {
+    const taskId = taskIds[index]
     const state = await getState()
+    const parent = state.tasks.find((item) => item.id === parentTaskId)
     const task = state.tasks.find((item) => item.id === taskId)
-    if (!task) continue
+    if (!parent || !task) continue
     await appendEvent(parentTaskId, {
       type: "system",
       text: `Starting ${task.agent}: ${task.title}`,
@@ -240,6 +285,7 @@ async function runTaskChain(parentTaskId: string, taskIds: string[]) {
       type: "system",
       text: `Completed ${task.agent}: ${task.title}`,
     })
+    await appendAdaptiveChildren(parent, task, taskIds, index, scale)
   }
   await setTaskStatus(parentTaskId, "completed", "Orchestration chain completed")
 }
