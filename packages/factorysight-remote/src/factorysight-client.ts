@@ -8,8 +8,11 @@ import { attachedFileContext, appendDeliverable, runTask as runFactorySightCliTa
 import { runnerAgentFor } from "./agent-routing"
 import {
   adaptiveOrchestrationSteps,
+  adaptiveBatchKey,
+  appendAdaptiveTaskIds,
   childPrompt,
   handoffText,
+  limitAdaptiveSteps,
   orchestrationStepForTask,
   type OrchestrationScale,
 } from "./orchestration"
@@ -42,6 +45,11 @@ type FactorySightAgent = {
   steps?: number
   permissions?: unknown[]
 }
+
+type FactorySightMessageState =
+  | { status: "running"; text?: string }
+  | { status: "completed"; text: string }
+  | { status: "failed"; text: string }
 
 function binaryPath() {
   return (
@@ -89,6 +97,67 @@ export function factorySightApiUrl(baseUrl: string, requestPath: string) {
   return new URL(requestPath.replace(/^\//, ""), baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`).toString()
 }
 
+export function isSessionWaitUnavailable(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error)
+  return /ServiceUnavailableError|session\.wait|Session wait is not available yet/i.test(message)
+}
+
+function textFromMessageContent(content: unknown) {
+  if (!Array.isArray(content)) return ""
+  return content
+    .map((part) => {
+      if (!part || typeof part !== "object") return undefined
+      const candidate = part as { type?: unknown; text?: unknown }
+      return candidate.type === "text" && typeof candidate.text === "string" ? candidate.text : undefined
+    })
+    .filter((text): text is string => Boolean(text))
+    .join("\n")
+    .trim()
+}
+
+export function sessionMessagesState(response: unknown): FactorySightMessageState {
+  const data =
+    typeof response === "object" && response && "data" in response ? (response as { data?: unknown }).data : response
+  if (!Array.isArray(data)) return { status: "running" }
+  const assistantMessages = data.filter((item) => {
+    if (!item || typeof item !== "object") return false
+    return (item as { type?: unknown }).type === "assistant"
+  })
+  const latest = assistantMessages.at(-1) as
+    | { finish?: unknown; error?: unknown; content?: unknown; time?: { completed?: unknown } }
+    | undefined
+  if (!latest) return { status: "running" }
+
+  if (latest.finish === "error") {
+    const error = latest.error as { message?: unknown } | undefined
+    return {
+      status: "failed",
+      text: typeof error?.message === "string" ? error.message : "FactorySight backend message failed",
+    }
+  }
+
+  const text = textFromMessageContent(latest.content)
+  if (typeof latest.finish === "string" || latest.time?.completed) {
+    return { status: "completed", text: text || "FactorySight backend completed without text output." }
+  }
+
+  return { status: "running", text }
+}
+
+export async function withFactorySightTimeout<T>(promise: Promise<T>, label: string, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`Timed out waiting for ${label}`)), timeoutMs)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 async function factorySightHttpApi(method: string, requestPath: string, body?: unknown) {
   const baseUrl = process.env.FACTORYSIGHT_BACKEND_URL
   if (!baseUrl) return undefined
@@ -129,6 +198,32 @@ async function factorySightApi(method: string, requestPath: string, body?: unkno
   if (exitCode !== 0) throw new Error(stderr.trim() || stdout.trim() || `FactorySight API exited with code ${exitCode}`)
   if (!stdout.trim()) return undefined
   return JSON.parse(stdout)
+}
+
+async function waitForFactorySightSession(sessionId: string) {
+  const timeoutMs = Number(process.env.FACTORYSIGHT_REMOTE_SESSION_WAIT_MS ?? 15_000)
+  try {
+    await withFactorySightTimeout(
+      factorySightApi("POST", `/api/session/${encodeURIComponent(sessionId)}/wait`),
+      `FactorySight session ${sessionId}`,
+      timeoutMs,
+    )
+    return
+  } catch (error) {
+    if (!isSessionWaitUnavailable(error)) throw error
+  }
+
+  const intervalMs = Number(process.env.FACTORYSIGHT_REMOTE_SESSION_POLL_MS ?? 1_000)
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    const state = sessionMessagesState(
+      await factorySightApi("GET", `/api/session/${encodeURIComponent(sessionId)}/message?order=asc&limit=50`),
+    )
+    if (state.status === "completed") return state.text
+    if (state.status === "failed") throw new Error(state.text)
+    await new Promise((resolve) => setTimeout(resolve, intervalMs))
+  }
+  throw new Error(`Timed out waiting for FactorySight session ${sessionId}`)
 }
 
 export async function factorySightModels() {
@@ -305,6 +400,11 @@ function canFallbackToFactorySightCli(error: unknown) {
   return /Commands:|Unknown command|Invalid command|Did you mean/i.test(message)
 }
 
+export function isFactorySightTransportFallbackError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error)
+  return canFallbackToFactorySightCli(error) || /Timed out waiting for FactorySight session/i.test(message)
+}
+
 async function runFactorySightTask(task: Task, project: Project) {
   const runnerAgent = runnerAgentFor(task.agent)
   await setTaskStatus(task.id, "running", `FactorySight backend started ${task.agent} on ${task.model}`)
@@ -331,14 +431,15 @@ async function runFactorySightTask(task: Task, project: Project) {
       prompt: { text: await attachedFileContext(task, project.path) },
     })
     await appendEvent(task.id, { type: "system", text: "Prompt sent to FactorySight backend" })
-    await factorySightApi("POST", `/api/session/${encodeURIComponent(sessionId)}/wait`)
+    const output = await waitForFactorySightSession(sessionId)
+    if (output) await appendEvent(task.id, { type: "runner", text: output })
     await appendDeliverable(task, project.path, 0)
     await setTaskStatus(task.id, "completed", "FactorySight backend completed task")
   } catch (error) {
-    if (!canFallbackToFactorySightCli(error)) throw error
+    if (!isFactorySightTransportFallbackError(error)) throw error
     await appendEvent(task.id, {
       type: "system",
-      text: "FactorySight API is not available in this installation. Falling back to FactorySight CLI transport.",
+      text: "FactorySight HTTP transport did not complete this task. Falling back to FactorySight CLI transport.",
     })
     await runFactorySightCliTask(task.id)
   }
@@ -382,10 +483,11 @@ async function appendAdaptiveFactorySightChildren(
   parent: Task,
   completed: Task,
   taskIds: string[],
-  insertAfterIndex: number,
   scale: OrchestrationScale,
 ) {
   const state = await getState()
+  const batchKey = adaptiveBatchKey(completed.agent)
+  if (batchKey && parent.events.some((event) => event.text.includes(`Adaptive topology batch ${batchKey}`))) return
   const currentChildren = state.tasks.filter((task) => task.parentTaskId === parent.id)
   const completedOutput = completed.events
     .filter((event) => ["deliverable", "runner", "error", "handoff", "system"].includes(event.type))
@@ -393,14 +495,19 @@ async function appendAdaptiveFactorySightChildren(
     .map((event) => event.text)
     .join("\n")
   const availableAgents = (await factorySightAgents()).agents
-  const steps = adaptiveOrchestrationSteps({
-    prompt: parent.prompt,
-    scale,
-    completedAgent: completed.agent,
-    existingAgents: currentChildren.map((task) => task.agent),
-    completedOutput,
-    availableAgents,
-  })
+  const maxChildren = Number(process.env.FACTORYSIGHT_REMOTE_MAX_WORKFLOW_CHILDREN ?? 8)
+  const steps = limitAdaptiveSteps(
+    adaptiveOrchestrationSteps({
+      prompt: parent.prompt,
+      scale,
+      completedAgent: completed.agent,
+      existingAgents: currentChildren.map((task) => task.agent),
+      completedOutput,
+      availableAgents,
+    }),
+    currentChildren.length,
+    maxChildren,
+  )
   if (!steps.length) return
 
   const created: Task[] = []
@@ -419,13 +526,12 @@ async function appendAdaptiveFactorySightChildren(
     created.push(child)
     await appendEvent(parent.id, {
       type: "system",
-      text: `Adaptive topology added ${step.phase} role ${step.agent}: ${step.title}`,
+      text: `Adaptive topology batch ${batchKey ?? step.phase} added ${step.phase} role ${step.agent}: ${step.title}`,
     })
   }
-  taskIds.splice(insertAfterIndex + 1, 0, ...created.map((task) => task.id))
-  const nextChildren = (parent.childTaskIds ?? taskIds).filter((id) => !created.some((task) => task.id === id))
-  nextChildren.splice(insertAfterIndex + 1, 0, ...created.map((task) => task.id))
-  await patchTask(parent.id, { childTaskIds: nextChildren })
+  const createdIds = created.map((task) => task.id)
+  taskIds.splice(0, taskIds.length, ...appendAdaptiveTaskIds(taskIds, createdIds))
+  await patchTask(parent.id, { childTaskIds: appendAdaptiveTaskIds(parent.childTaskIds ?? taskIds, createdIds) })
 }
 
 async function runFactorySightTaskChain(parentTaskId: string, taskIds: string[], scale: OrchestrationScale) {
@@ -483,7 +589,7 @@ async function runFactorySightTaskChain(parentTaskId: string, taskIds: string[],
       text: handoffText({ from: task.agent, to: "orchestrator", step, status: "accepted" }),
     })
     await appendEvent(parentTaskId, { type: "system", text: `Completed ${task.agent}: ${task.title}` })
-    await appendAdaptiveFactorySightChildren(parent, updated ?? task, taskIds, index, scale)
+    await appendAdaptiveFactorySightChildren(parent, updated ?? task, taskIds, scale)
   }
   await setTaskStatus(parentTaskId, "completed", "FactorySight backend orchestration completed")
 }

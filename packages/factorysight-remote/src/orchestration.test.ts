@@ -1,10 +1,13 @@
 import { expect, test } from "bun:test"
 import {
   adaptiveOrchestrationSteps,
+  adaptiveBatchKey,
+  appendAdaptiveTaskIds,
   childPrompt,
   handoffText,
   initialOrchestrationPlan,
   orchestrationPlan,
+  limitAdaptiveSteps,
 } from "./orchestration"
 import type { Task } from "./shared"
 
@@ -115,4 +118,31 @@ test("childPrompt includes four-step workflow methodology and JSON handoff contr
   expect(prompt).toContain("```json")
   expect(prompt).toContain('"execution"')
   expect(prompt).toContain("uncertainty/conflict")
+})
+
+test("appendAdaptiveTaskIds keeps existing workflow order before adaptive nodes", () => {
+  expect(appendAdaptiveTaskIds(["plan", "product", "tech", "build"], ["security", "docs"])).toEqual([
+    "plan",
+    "product",
+    "tech",
+    "build",
+    "security",
+    "docs",
+  ])
+  expect(appendAdaptiveTaskIds(["plan", "security"], ["security", "docs"])).toEqual(["plan", "security", "docs"])
+})
+
+test("adaptiveBatchKey groups dynamic topology additions by workflow phase", () => {
+  expect(adaptiveBatchKey("plan")).toBe("design")
+  expect(adaptiveBatchKey("tech-lead")).toBe("build")
+  expect(adaptiveBatchKey("ux-designer")).toBe("build")
+  expect(adaptiveBatchKey("build")).toBe("verify")
+  expect(adaptiveBatchKey("backend-engineer")).toBe("verify")
+  expect(adaptiveBatchKey("code-reviewer")).toBeUndefined()
+})
+
+test("limitAdaptiveSteps caps dynamic workflow growth", () => {
+  expect(limitAdaptiveSteps(["a", "b", "c"], 6, 8)).toEqual(["a", "b"])
+  expect(limitAdaptiveSteps(["a", "b"], 8, 8)).toEqual([])
+  expect(limitAdaptiveSteps(["a", "b"], 3, 8)).toEqual(["a", "b"])
 })

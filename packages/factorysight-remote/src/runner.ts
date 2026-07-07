@@ -4,8 +4,11 @@ import { appendEvent, createTask, getState, patchTask, setTaskStatus } from "./s
 import { defaultAgents, type Task } from "./shared"
 import {
   adaptiveOrchestrationSteps,
+  adaptiveBatchKey,
+  appendAdaptiveTaskIds,
   childPrompt,
   handoffText,
+  limitAdaptiveSteps,
   orchestrationStepForTask,
   type OrchestrationScale,
 } from "./orchestration"
@@ -223,28 +226,29 @@ export function enqueueTaskChain(parentTaskId: string, tasks: Task[], scale: Orc
   void runTaskChain(parentTaskId, taskIds, scale)
 }
 
-async function appendAdaptiveChildren(
-  parent: Task,
-  completed: Task,
-  taskIds: string[],
-  insertAfterIndex: number,
-  scale: OrchestrationScale,
-) {
+async function appendAdaptiveChildren(parent: Task, completed: Task, taskIds: string[], scale: OrchestrationScale) {
   const state = await getState()
+  const batchKey = adaptiveBatchKey(completed.agent)
+  if (batchKey && parent.events.some((event) => event.text.includes(`Adaptive topology batch ${batchKey}`))) return
   const currentChildren = state.tasks.filter((task) => task.parentTaskId === parent.id)
   const completedOutput = completed.events
     .filter((event) => ["deliverable", "runner", "error", "handoff", "system"].includes(event.type))
     .slice(-20)
     .map((event) => event.text)
     .join("\n")
-  const steps = adaptiveOrchestrationSteps({
-    prompt: parent.prompt,
-    scale,
-    completedAgent: completed.agent,
-    existingAgents: currentChildren.map((task) => task.agent),
-    completedOutput,
-    availableAgents: defaultAgents,
-  })
+  const maxChildren = Number(process.env.FACTORYSIGHT_REMOTE_MAX_WORKFLOW_CHILDREN ?? 8)
+  const steps = limitAdaptiveSteps(
+    adaptiveOrchestrationSteps({
+      prompt: parent.prompt,
+      scale,
+      completedAgent: completed.agent,
+      existingAgents: currentChildren.map((task) => task.agent),
+      completedOutput,
+      availableAgents: defaultAgents,
+    }),
+    currentChildren.length,
+    maxChildren,
+  )
   if (!steps.length) return
 
   const created: Task[] = []
@@ -263,13 +267,12 @@ async function appendAdaptiveChildren(
     created.push(child)
     await appendEvent(parent.id, {
       type: "system",
-      text: `Adaptive topology added ${step.phase} role ${step.agent}: ${step.title}`,
+      text: `Adaptive topology batch ${batchKey ?? step.phase} added ${step.phase} role ${step.agent}: ${step.title}`,
     })
   }
-  taskIds.splice(insertAfterIndex + 1, 0, ...created.map((task) => task.id))
-  const nextChildren = (parent.childTaskIds ?? taskIds).filter((id) => !created.some((task) => task.id === id))
-  nextChildren.splice(insertAfterIndex + 1, 0, ...created.map((task) => task.id))
-  await patchTask(parent.id, { childTaskIds: nextChildren })
+  const createdIds = created.map((task) => task.id)
+  taskIds.splice(0, taskIds.length, ...appendAdaptiveTaskIds(taskIds, createdIds))
+  await patchTask(parent.id, { childTaskIds: appendAdaptiveTaskIds(parent.childTaskIds ?? taskIds, createdIds) })
 }
 
 async function runTaskChain(parentTaskId: string, taskIds: string[], scale: OrchestrationScale) {
@@ -333,7 +336,7 @@ async function runTaskChain(parentTaskId: string, taskIds: string[], scale: Orch
       type: "system",
       text: `Completed ${task.agent}: ${task.title}`,
     })
-    await appendAdaptiveChildren(parent, updated ?? task, taskIds, index, scale)
+    await appendAdaptiveChildren(parent, updated ?? task, taskIds, scale)
   }
   await setTaskStatus(parentTaskId, "completed", "Orchestration chain completed")
 }

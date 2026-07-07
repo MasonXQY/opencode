@@ -360,6 +360,22 @@ export function adaptiveOrchestrationSteps(input: {
   return []
 }
 
+export function adaptiveBatchKey(completedAgent: string) {
+  if (completedAgent === "plan") return "design"
+  if (["product-lead", "tech-lead", "architect", "ux-designer"].includes(completedAgent)) return "build"
+  if (completedAgent === "build" || completedAgent.endsWith("-engineer")) return "verify"
+  return undefined
+}
+
+export function appendAdaptiveTaskIds(existingIds: string[], createdIds: string[]) {
+  const existing = new Set(existingIds)
+  return [...existingIds, ...createdIds.filter((id) => !existing.has(id))]
+}
+
+export function limitAdaptiveSteps<T>(steps: T[], currentChildCount: number, maxChildren = 8) {
+  return steps.slice(0, Math.max(0, maxChildren - currentChildCount))
+}
+
 export function orchestrationStepForTask(
   parent: Task,
   task: Task,

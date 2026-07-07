@@ -4,6 +4,10 @@ import {
   factorySightApiArgs,
   factorySightApiUrl,
   factorySightSessionToTask,
+  isFactorySightTransportFallbackError,
+  isSessionWaitUnavailable,
+  sessionMessagesState,
+  withFactorySightTimeout,
   modelRefFromString,
   modelsFromFactorySightResponse,
 } from "./factorysight-client"
@@ -107,4 +111,57 @@ test("factorySightSessionToTask maps FactorySight sessions to Remote task cards"
     status: "completed",
     sessionId: "ses_123",
   })
+})
+
+test("isSessionWaitUnavailable detects FactorySight wait capability gaps", () => {
+  expect(
+    isSessionWaitUnavailable(
+      new Error(
+        '{"_tag":"ServiceUnavailableError","message":"Session wait is not available yet","service":"session.wait"}',
+      ),
+    ),
+  ).toBe(true)
+  expect(isSessionWaitUnavailable(new Error("provider failed"))).toBe(false)
+})
+
+test("FactorySight timeout errors can fall back to CLI transport", () => {
+  expect(isFactorySightTransportFallbackError(new Error("Timed out waiting for FactorySight session ses_123"))).toBe(
+    true,
+  )
+  expect(isFactorySightTransportFallbackError(new Error("Session wait is not available yet"))).toBe(false)
+})
+
+test("withFactorySightTimeout rejects hung wait calls", async () => {
+  await expect(withFactorySightTimeout(new Promise(() => {}), "FactorySight session ses_hung", 5)).rejects.toThrow(
+    "Timed out waiting for FactorySight session ses_hung",
+  )
+})
+
+test("sessionMessagesState classifies completed and failed FactorySight messages", () => {
+  expect(
+    sessionMessagesState({
+      data: [
+        { id: "msg_user", type: "user", text: "hello" },
+        {
+          id: "msg_assistant",
+          type: "assistant",
+          finish: "stop",
+          content: [{ type: "text", text: "OK" }],
+        },
+      ],
+    }),
+  ).toEqual({ status: "completed", text: "OK" })
+
+  expect(
+    sessionMessagesState({
+      data: [
+        {
+          id: "msg_assistant",
+          type: "assistant",
+          finish: "error",
+          error: { message: "Provider request failed" },
+        },
+      ],
+    }),
+  ).toEqual({ status: "failed", text: "Provider request failed" })
 })
