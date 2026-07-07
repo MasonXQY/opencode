@@ -521,6 +521,20 @@ label {
   display: block;
 }
 
+.agent-card em {
+  min-width: 0;
+  overflow: hidden;
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 820;
+  line-height: 14px;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .agent-card small,
 .project-row small,
 .task-row small,
@@ -1581,6 +1595,18 @@ label {
   font-family: "SFMono-Regular", Consolas, monospace;
   font-size: 12px;
   line-height: 18px;
+}
+
+.event-line.handoff {
+  margin-top: 6px;
+  padding: 9px 10px;
+  border: 1px solid rgb(102 87 255 / 0.2);
+  border-radius: 4px;
+  background: rgb(102 87 255 / 0.06);
+}
+
+.event-line.handoff span {
+  color: #4d3fe0;
 }
 
 .message-form {

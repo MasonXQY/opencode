@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
 import {
+  agentsFromFactorySightResponse,
   factorySightApiArgs,
   factorySightApiUrl,
   factorySightSessionToTask,
@@ -31,6 +32,40 @@ test("modelsFromFactorySightResponse flattens FactorySight model list responses"
       ],
     }),
   ).toEqual(["anthropic/claude-opus-4-8", "anthropic/claude-sonnet-4-5"])
+})
+
+test("agentsFromFactorySightResponse maps FactorySight agents into Remote profiles", () => {
+  const result = agentsFromFactorySightResponse({
+    data: [
+      {
+        id: "product-lead",
+        mode: "primary",
+        description: "Shapes product work",
+        steps: 20,
+        permissions: [{ permission: "read", action: "allow" }],
+      },
+      {
+        id: "backend-engineer",
+        mode: "subagent",
+        description: "Builds APIs",
+      },
+    ],
+  })
+
+  expect(result.agents).toEqual(["product-lead", "backend-engineer"])
+  expect(result.agentProfiles["product-lead"]).toMatchObject({
+    id: "product-lead",
+    mode: "primary",
+    backend: "factorysight",
+    summary: "Shapes product work",
+    steps: 20,
+    permissions: ["read:allow"],
+  })
+  expect(result.agentProfiles["backend-engineer"]).toMatchObject({
+    mode: "subagent",
+    backend: "factorysight",
+    summary: "Builds APIs",
+  })
 })
 
 test("factorySightApiArgs builds raw FactorySight API commands", () => {

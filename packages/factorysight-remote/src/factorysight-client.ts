@@ -1,12 +1,18 @@
 import path from "node:path"
 import { spawn } from "node:child_process"
 import { appendEvent, createTask, getState, patchTask, setTaskStatus } from "./store"
-import type { Project, Task } from "./shared"
-import { defaultModels, preferredDefaultModel } from "./shared"
+import type { AgentMode, AgentProfile, Project, Task } from "./shared"
+import { agentProfiles, defaultAgents, defaultModels, preferredDefaultModel } from "./shared"
 import { availableModels as factorySightCliModels } from "./models"
 import { attachedFileContext, appendDeliverable, runTask as runFactorySightCliTask } from "./runner"
 import { runnerAgentFor } from "./agent-routing"
-import { adaptiveOrchestrationSteps, childPrompt, type OrchestrationScale } from "./orchestration"
+import {
+  adaptiveOrchestrationSteps,
+  childPrompt,
+  handoffText,
+  orchestrationStepForTask,
+  type OrchestrationScale,
+} from "./orchestration"
 
 type FactorySightSession = {
   id: string
@@ -25,6 +31,16 @@ type FactorySightSession = {
     updated?: number
     archived?: number
   }
+}
+
+type FactorySightAgent = {
+  id?: string
+  name?: string
+  mode?: AgentMode
+  description?: string
+  color?: string
+  steps?: number
+  permissions?: unknown[]
 }
 
 function binaryPath() {
@@ -120,6 +136,95 @@ export async function factorySightModels() {
     return modelsFromFactorySightResponse(await factorySightApi("GET", "/api/model"))
   } catch {
     return factorySightCliModels().catch(() => defaultModels)
+  }
+}
+
+function initialsFromAgentId(id: string) {
+  return id
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase())
+    .join("")
+    .slice(0, 2)
+}
+
+function titleFromAgentId(id: string) {
+  return id
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
+    .join(" ")
+}
+
+function agentPermissionSummary(value: unknown[] | undefined) {
+  if (!value) return undefined
+  return value
+    .map((item) => {
+      if (typeof item === "string") return item
+      if (!item || typeof item !== "object") return undefined
+      const candidate = item as { permission?: unknown; action?: unknown; type?: unknown }
+      const permission = typeof candidate.permission === "string" ? candidate.permission : candidate.type
+      const action = typeof candidate.action === "string" ? candidate.action : undefined
+      return typeof permission === "string" ? [permission, action].filter(Boolean).join(":") : undefined
+    })
+    .filter((item): item is string => Boolean(item))
+}
+
+export function agentsFromFactorySightResponse(response: unknown) {
+  const data =
+    typeof response === "object" && response && "data" in response ? (response as { data?: unknown }).data : response
+  if (!Array.isArray(data)) {
+    return {
+      agents: defaultAgents,
+      agentProfiles,
+    }
+  }
+
+  const profiles: Record<string, AgentProfile> = {}
+  for (const item of data) {
+    if (!item || typeof item !== "object") continue
+    const candidate = item as FactorySightAgent
+    const id =
+      typeof candidate.id === "string" ? candidate.id : typeof candidate.name === "string" ? candidate.name : undefined
+    if (!id) continue
+    const fallback = agentProfiles[id]
+    profiles[id] = {
+      id,
+      name: fallback?.name ?? titleFromAgentId(id),
+      title: fallback?.title ?? titleFromAgentId(id),
+      initials: fallback?.initials ?? initialsFromAgentId(id),
+      color: typeof candidate.color === "string" ? candidate.color : (fallback?.color ?? "#8f8f8f"),
+      summary:
+        typeof candidate.description === "string"
+          ? candidate.description
+          : (fallback?.summary ?? "FactorySight backend agent."),
+      mode: candidate.mode ?? fallback?.mode ?? "all",
+      backend: "factorysight",
+      steps: typeof candidate.steps === "number" ? candidate.steps : fallback?.steps,
+      permissions: agentPermissionSummary(candidate.permissions) ?? fallback?.permissions,
+    }
+  }
+
+  const agents = Object.keys(profiles)
+  return agents.length
+    ? {
+        agents,
+        agentProfiles: profiles,
+      }
+    : {
+        agents: defaultAgents,
+        agentProfiles,
+      }
+}
+
+export async function factorySightAgents() {
+  try {
+    return agentsFromFactorySightResponse(await factorySightApi("GET", "/api/agent"))
+  } catch {
+    return {
+      agents: defaultAgents,
+      agentProfiles,
+    }
   }
 }
 
@@ -323,17 +428,52 @@ async function runFactorySightTaskChain(parentTaskId: string, taskIds: string[],
     const parent = state.tasks.find((item) => item.id === parentTaskId)
     const task = state.tasks.find((item) => item.id === taskId)
     if (!parent || !task) continue
+    const step = orchestrationStepForTask(parent, task, scale)
+    const previous =
+      index === 0
+        ? "orchestrator"
+        : (state.tasks.find((item) => item.id === taskIds[index - 1])?.agent ?? "orchestrator")
+    await appendEvent(parentTaskId, {
+      type: "handoff",
+      text: handoffText({ from: previous, to: task.agent, step, status: "offered" }),
+    })
     await appendEvent(parentTaskId, { type: "system", text: `Starting ${task.agent}: ${task.title}` })
     await runFactorySightTaskById(task.id)
-    const updated = (await getState()).tasks.find((item) => item.id === task.id)
+    let updated = (await getState()).tasks.find((item) => item.id === task.id)
+    if (updated?.status === "failed" && step.failurePolicy === "retry") {
+      await appendEvent(parentTaskId, {
+        type: "handoff",
+        text: `Retrying ${task.agent} once because this handoff is required for downstream work.`,
+      })
+      await runFactorySightTaskById(task.id)
+      updated = (await getState()).tasks.find((item) => item.id === task.id)
+    }
     if (updated?.status === "failed") {
       await appendEvent(parentTaskId, {
         type: "error",
-        text: `${task.agent} failed in FactorySight backend. Stopping the remaining orchestration chain.`,
+        text:
+          step.failurePolicy === "continue"
+            ? `${task.agent} failed in FactorySight backend. Continuing because this handoff is non-blocking.`
+            : `${task.agent} failed in FactorySight backend. Stopping the remaining orchestration chain.`,
       })
+      await appendEvent(parentTaskId, {
+        type: "handoff",
+        text: handoffText({ from: task.agent, to: "orchestrator", step, status: "failed" }),
+      })
+      if (step.failurePolicy === "continue") {
+        await appendEvent(parentTaskId, {
+          type: "handoff",
+          text: handoffText({ from: task.agent, to: "orchestrator", step, status: "continued" }),
+        })
+        continue
+      }
       await setTaskStatus(parentTaskId, "failed", `Stopped after ${task.agent} failed`)
       return
     }
+    await appendEvent(parentTaskId, {
+      type: "handoff",
+      text: handoffText({ from: task.agent, to: "orchestrator", step, status: "accepted" }),
+    })
     await appendEvent(parentTaskId, { type: "system", text: `Completed ${task.agent}: ${task.title}` })
     await appendAdaptiveFactorySightChildren(parent, task, taskIds, index, scale)
   }

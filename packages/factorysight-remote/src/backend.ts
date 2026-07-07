@@ -3,11 +3,13 @@ import type { OrchestrationScale } from "./orchestration"
 import { availableModels as localModels } from "./models"
 import { enqueueTask as enqueueLocalTask, enqueueTaskChain as enqueueLocalTaskChain } from "./runner"
 import {
+  factorySightAgents,
   enqueueFactorySightTask,
   enqueueFactorySightTaskChain,
   factorySightModels,
   factorySightTasksForProjects,
 } from "./factorysight-client"
+import { agentProfiles, defaultAgents } from "./shared"
 
 export type RemoteBackendMode = "local" | "factorysight"
 
@@ -17,6 +19,15 @@ export function remoteBackendMode(): RemoteBackendMode {
 
 export async function backendModels() {
   return remoteBackendMode() === "factorysight" ? factorySightModels() : localModels()
+}
+
+export async function backendAgents() {
+  return remoteBackendMode() === "factorysight"
+    ? factorySightAgents()
+    : {
+        agents: defaultAgents,
+        agentProfiles,
+      }
 }
 
 export async function backendTasks(localTasks: Task[], projects: Project[], userId: string) {

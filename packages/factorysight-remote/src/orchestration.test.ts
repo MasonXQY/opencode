@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { adaptiveOrchestrationSteps, initialOrchestrationPlan, orchestrationPlan } from "./orchestration"
+import { adaptiveOrchestrationSteps, handoffText, initialOrchestrationPlan, orchestrationPlan } from "./orchestration"
 
 test("orchestrationPlan starts with a primary planning step before specialist roles", () => {
   const plan = orchestrationPlan("Build a responsive web app with backend auth", "balanced")
@@ -40,4 +40,25 @@ test("adaptiveOrchestrationSteps adds demand-specific roles while running", () =
 
   expect(steps.some((step) => step.agent === "frontend-engineer")).toBe(true)
   expect(steps.some((step) => step.agent === "backend-engineer")).toBe(true)
+})
+
+test("orchestration steps include explicit handoff contracts", () => {
+  const plan = orchestrationPlan("Build backend API and frontend UI", "wide")
+  const backend = plan.find((step) => step.agent === "backend-engineer")
+
+  expect(backend).toMatchObject({
+    failurePolicy: "retry",
+    acceptance: expect.any(String),
+  })
+  expect(backend?.requires.length).toBeGreaterThan(0)
+  expect(backend?.provides.length).toBeGreaterThan(0)
+})
+
+test("handoffText summarizes agent handshake state", () => {
+  const [step] = orchestrationPlan("Build backend API", "balanced")
+  if (!step) throw new Error("expected a plan step")
+
+  expect(handoffText({ from: "orchestrator", to: step.agent, step, status: "offered" })).toContain(
+    "Agent handoff offered: orchestrator -> plan",
+  )
 })

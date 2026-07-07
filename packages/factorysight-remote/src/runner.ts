@@ -2,7 +2,13 @@ import path from "node:path"
 import { spawn } from "node:child_process"
 import { appendEvent, createTask, getState, patchTask, setTaskStatus } from "./store"
 import type { Task } from "./shared"
-import { adaptiveOrchestrationSteps, childPrompt, type OrchestrationScale } from "./orchestration"
+import {
+  adaptiveOrchestrationSteps,
+  childPrompt,
+  handoffText,
+  orchestrationStepForTask,
+  type OrchestrationScale,
+} from "./orchestration"
 import { listProjectFiles } from "./file-storage"
 import { runnerAgentFor } from "./agent-routing"
 import { writeTaskDeliverableArtifact } from "./artifact-storage"
@@ -267,20 +273,55 @@ async function runTaskChain(parentTaskId: string, taskIds: string[], scale: Orch
     const parent = state.tasks.find((item) => item.id === parentTaskId)
     const task = state.tasks.find((item) => item.id === taskId)
     if (!parent || !task) continue
+    const step = orchestrationStepForTask(parent, task, scale)
+    const previous =
+      index === 0
+        ? "orchestrator"
+        : (state.tasks.find((item) => item.id === taskIds[index - 1])?.agent ?? "orchestrator")
+    await appendEvent(parentTaskId, {
+      type: "handoff",
+      text: handoffText({ from: previous, to: task.agent, step, status: "offered" }),
+    })
     await appendEvent(parentTaskId, {
       type: "system",
       text: `Starting ${task.agent}: ${task.title}`,
     })
     await runTask(task.id)
-    const updated = (await getState()).tasks.find((item) => item.id === task.id)
+    let updated = (await getState()).tasks.find((item) => item.id === task.id)
+    if (updated?.status === "failed" && step.failurePolicy === "retry") {
+      await appendEvent(parentTaskId, {
+        type: "handoff",
+        text: `Retrying ${task.agent} once because this handoff is required for downstream work.`,
+      })
+      await runTask(task.id)
+      updated = (await getState()).tasks.find((item) => item.id === task.id)
+    }
     if (updated?.status === "failed") {
       await appendEvent(parentTaskId, {
         type: "error",
-        text: `${task.agent} failed. Stopping the remaining orchestration chain.`,
+        text:
+          step.failurePolicy === "continue"
+            ? `${task.agent} failed. Continuing because this handoff is non-blocking.`
+            : `${task.agent} failed. Stopping the remaining orchestration chain.`,
       })
+      await appendEvent(parentTaskId, {
+        type: "handoff",
+        text: handoffText({ from: task.agent, to: "orchestrator", step, status: "failed" }),
+      })
+      if (step.failurePolicy === "continue") {
+        await appendEvent(parentTaskId, {
+          type: "handoff",
+          text: handoffText({ from: task.agent, to: "orchestrator", step, status: "continued" }),
+        })
+        continue
+      }
       await setTaskStatus(parentTaskId, "failed", `Stopped after ${task.agent} failed`)
       return
     }
+    await appendEvent(parentTaskId, {
+      type: "handoff",
+      text: handoffText({ from: task.agent, to: "orchestrator", step, status: "accepted" }),
+    })
     await appendEvent(parentTaskId, {
       type: "system",
       text: `Completed ${task.agent}: ${task.title}`,

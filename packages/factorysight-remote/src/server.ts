@@ -22,17 +22,16 @@ import {
   visibleProjects,
   visibleTasks,
 } from "./store"
-import { backendModels, backendTasks, enqueueBackendTask, enqueueBackendTaskChain, remoteBackendMode } from "./backend"
-import { childPrompt, initialOrchestrationPlan } from "./orchestration"
 import {
-  agentProfiles,
-  defaultAgents,
-  permissionProfiles,
-  type Artifact,
-  type Project,
-  type Task,
-  type User,
-} from "./shared"
+  backendAgents,
+  backendModels,
+  backendTasks,
+  enqueueBackendTask,
+  enqueueBackendTaskChain,
+  remoteBackendMode,
+} from "./backend"
+import { childPrompt, initialOrchestrationPlan } from "./orchestration"
+import { permissionProfiles, type Artifact, type Project, type Task, type User } from "./shared"
 import { listProjectFiles, saveUploadedFile } from "./file-storage"
 import { listProjectArtifacts, writeTaskDeliverableArtifact } from "./artifact-storage"
 
@@ -241,6 +240,7 @@ app.get("/api/app/bootstrap", async (c) => {
   const user = c.get("user")
   const state = await getState()
   const projects = await visibleProjects(user.id)
+  const agents = await backendAgents()
   return c.json({
     user,
     users: state.users,
@@ -248,8 +248,8 @@ app.get("/api/app/bootstrap", async (c) => {
     tasks: await backendTasks(await visibleTasks(user.id), projects, user.id),
     artifacts: await visibleArtifacts(user.id),
     files: (await Promise.all(projects.map((project) => listProjectFiles(project.path)))).flat(),
-    agents: defaultAgents,
-    agentProfiles,
+    agents: agents.agents,
+    agentProfiles: agents.agentProfiles,
     models: await backendModels(),
     backendMode: remoteBackendMode(),
     permissionProfiles,

@@ -30,7 +30,7 @@ export type TaskEvent = {
   id: string
   taskId: string
   at: string
-  type: "created" | "status" | "message" | "runner" | "error" | "approval" | "system" | "deliverable"
+  type: "created" | "status" | "message" | "runner" | "error" | "approval" | "system" | "handoff" | "deliverable"
   authorId?: string
   text: string
 }
@@ -159,6 +159,8 @@ export type BootstrapData = {
   permissionProfiles: PermissionProfile[]
 }
 
+export type AgentMode = "primary" | "subagent" | "all"
+
 export type AgentProfile = {
   id: string
   name: string
@@ -166,6 +168,10 @@ export type AgentProfile = {
   initials: string
   color: string
   summary: string
+  mode?: AgentMode
+  backend?: "factorysight" | "remote"
+  steps?: number
+  permissions?: string[]
 }
 
 export const defaultAgents = [

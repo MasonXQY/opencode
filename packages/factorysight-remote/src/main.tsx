@@ -943,6 +943,7 @@ function AgentCard(props: { data: BootstrapData; agent: string }) {
       <div>
         <strong>{profile()?.name ?? props.agent}</strong>
         <small>{profile()?.title ?? props.agent}</small>
+        <em>{[profile()?.mode ?? "agent", profile()?.backend ?? "remote"].join(" · ")}</em>
       </div>
     </div>
   )
