@@ -1238,6 +1238,19 @@ function FlowNodeCard(props: {
   onDelete: (node: FlowNode) => void | Promise<void>
 }) {
   const profile = createMemo(() => (props.node.agent ? props.data.agentProfiles[props.node.agent] : undefined))
+  const bodyTitle = createMemo(() => {
+    const agent = profile()
+    if (agent) return agent.name
+    if (props.node.kind === "input") return "Input package"
+    if (props.node.kind === "artifact") return "Deliverables"
+    if (props.node.kind === "placeholder") return "Generated flow"
+    return props.node.subtitle
+  })
+  const bodySubtitle = createMemo(() => {
+    const agent = profile()
+    if (agent) return `${agent.title} · ${props.node.subtitle}`
+    return props.node.subtitle
+  })
   let startX = 0
   let startY = 0
   let nodeStartX = 0
@@ -1333,7 +1346,7 @@ function FlowNodeCard(props: {
         <span class="flow-node-index">
           {props.node.kind === "artifact" ? "OUT" : props.node.kind === "input" ? "IN" : props.index}
         </span>
-        <span class="flow-node-kind">{props.node.kind.replace("-", " ")}</span>
+        <span class="flow-node-kind">{props.node.title}</span>
       </div>
       <Show
         when={profile()}
@@ -1352,8 +1365,8 @@ function FlowNodeCard(props: {
           </div>
         )}
       </Show>
-      <strong>{props.node.title}</strong>
-      <small>{props.node.subtitle}</small>
+      <strong>{bodyTitle()}</strong>
+      <small>{bodySubtitle()}</small>
       <Show when={props.node.previews?.length}>
         <div class="flow-previews">
           <For each={props.node.previews}>

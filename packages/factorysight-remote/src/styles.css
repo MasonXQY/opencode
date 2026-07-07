@@ -981,12 +981,14 @@ label {
 
 .flow-node-index {
   min-width: 18px;
+  flex: 0 0 auto;
   color: inherit;
   font-size: 10px;
   font-weight: 900;
 }
 
 .flow-node-kind {
+  min-width: 0;
   overflow: hidden;
   color: inherit;
   font-size: 10px;
