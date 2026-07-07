@@ -994,8 +994,58 @@ function ProjectFiles(props: {
   const [gmailBusy, setGmailBusy] = createSignal(false)
   const [gmailQuery, setGmailQuery] = createSignal("newer_than:30d")
   const [gmailError, setGmailError] = createSignal("")
+  const [gmailConnecting, setGmailConnecting] = createSignal(false)
   const [gmailStatus, setGmailStatus] = createSignal(props.data.gmail)
+  let gmailConnectTimer: number | undefined
   createEffect(() => setGmailStatus(props.data.gmail))
+  const refreshGmailStatus = async () => {
+    const next = await props.api.gmailStatus()
+    setGmailStatus(next)
+    return next
+  }
+  const connectGmail = async () => {
+    setGmailBusy(true)
+    setGmailConnecting(true)
+    setGmailError("")
+    try {
+      const { url } = await props.api.connectGmail()
+      const popup = window.open(url, "factorysight-gmail", "popup=yes,width=560,height=720,noopener,noreferrer")
+      if (!popup) openInNewWindow(url)
+      const deadline = Date.now() + 90_000
+      if (gmailConnectTimer) window.clearInterval(gmailConnectTimer)
+      gmailConnectTimer = window.setInterval(async () => {
+        try {
+          const next = await refreshGmailStatus()
+          if (next.connected || Date.now() > deadline) {
+            if (gmailConnectTimer) window.clearInterval(gmailConnectTimer)
+            gmailConnectTimer = undefined
+            setGmailConnecting(false)
+            setGmailBusy(false)
+            await props.onRefresh()
+          }
+        } catch {}
+      }, 1500)
+    } catch (error) {
+      setGmailError(error instanceof Error ? error.message : String(error))
+      setGmailConnecting(false)
+      setGmailBusy(false)
+    }
+  }
+  createEffect(() => {
+    const onMessage = async (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return
+      if ((event.data as { type?: string })?.type !== "factorysight:gmail-connected") return
+      setGmailConnecting(false)
+      setGmailBusy(false)
+      await refreshGmailStatus()
+      await props.onRefresh()
+    }
+    window.addEventListener("message", onMessage)
+    onCleanup(() => window.removeEventListener("message", onMessage))
+  })
+  onCleanup(() => {
+    if (gmailConnectTimer) window.clearInterval(gmailConnectTimer)
+  })
   return (
     <Panel heading="Files" meta={`${props.files.length} project`}>
       <section class="data-source">
@@ -1010,24 +1060,8 @@ function ProjectFiles(props: {
         <Show
           when={gmailStatus().connected}
           fallback={
-            <button
-              type="button"
-              class="secondary"
-              disabled={gmailBusy()}
-              onClick={async () => {
-                setGmailBusy(true)
-                setGmailError("")
-                try {
-                  const { url } = await props.api.connectGmail()
-                  openInNewWindow(url)
-                } catch (error) {
-                  setGmailError(error instanceof Error ? error.message : String(error))
-                } finally {
-                  setGmailBusy(false)
-                }
-              }}
-            >
-              {gmailBusy() ? "Opening..." : "Connect Gmail"}
+            <button type="button" class="secondary" disabled={gmailBusy()} onClick={connectGmail}>
+              {gmailConnecting() ? "Waiting for Gmail..." : gmailBusy() ? "Opening..." : "Connect Gmail"}
             </button>
           }
         >
@@ -1054,6 +1088,26 @@ function ProjectFiles(props: {
               placeholder="Gmail search query"
             />
             <button disabled={!props.activeProjectId || gmailBusy()}>{gmailBusy() ? "Importing..." : "Import"}</button>
+            <button
+              type="button"
+              class="secondary"
+              disabled={gmailBusy()}
+              onClick={async () => {
+                setGmailBusy(true)
+                setGmailError("")
+                try {
+                  await props.api.disconnectGmail()
+                  setGmailStatus({ connected: false })
+                  await props.onRefresh()
+                } catch (error) {
+                  setGmailError(error instanceof Error ? error.message : String(error))
+                } finally {
+                  setGmailBusy(false)
+                }
+              }}
+            >
+              Disconnect
+            </button>
           </form>
         </Show>
         <Show when={gmailError()}>

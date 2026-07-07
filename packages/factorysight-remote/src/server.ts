@@ -105,6 +105,7 @@ function tokenFromCookie(header: string | undefined) {
 }
 
 async function requireUser(c: any, next: any) {
+  if (c.req.path === "/api/integrations/gmail/callback") return next()
   const user = await userForToken(
     tokenFromHeader(c.req.header("authorization")) ?? c.req.query("token") ?? tokenFromCookie(c.req.header("cookie")),
   )
@@ -277,7 +278,30 @@ app.get("/api/integrations/gmail/callback", async (c) => {
   const state = c.req.query("state")
   if (!code || !state) return c.text("Missing Gmail authorization code or state", 400)
   await completeGmailAuthorization({ code, state })
-  return c.html("<!doctype html><title>Gmail connected</title><p>Gmail is connected. You can close this window.</p>")
+  return c.html(`<!doctype html>
+<html>
+  <head>
+    <title>Gmail connected</title>
+    <style>
+      body { font-family: system-ui, sans-serif; display: grid; place-items: center; min-height: 100vh; margin: 0; background: #f7f7f5; color: #18191b; }
+      main { display: grid; gap: 8px; padding: 24px; border: 1px solid #deded9; background: white; }
+      strong { font-size: 16px; }
+      p { margin: 0; color: #6f7178; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <strong>Gmail connected</strong>
+      <p>You can close this window.</p>
+    </main>
+    <script>
+      try {
+        window.opener?.postMessage({ type: "factorysight:gmail-connected" }, window.location.origin);
+      } catch {}
+      setTimeout(() => window.close(), 700);
+    </script>
+  </body>
+</html>`)
 })
 
 app.delete("/api/integrations/gmail", async (c) => {
