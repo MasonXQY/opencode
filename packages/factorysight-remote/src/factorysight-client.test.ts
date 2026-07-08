@@ -3,10 +3,13 @@ import {
   agentsFromFactorySightResponse,
   factorySightApiArgs,
   factorySightApiUrl,
+  factorySightModelCandidates,
   factorySightSessionToTask,
+  factorySightPermissionRules,
   isFactorySightTransportFallbackError,
   isSessionWaitUnavailable,
   sessionMessagesState,
+  selectAvailableFactorySightModel,
   withFactorySightTimeout,
   modelRefFromString,
   modelsFromFactorySightResponse,
@@ -36,6 +39,48 @@ test("modelsFromFactorySightResponse flattens FactorySight model list responses"
       ],
     }),
   ).toEqual(["anthropic/claude-opus-4-8", "anthropic/claude-sonnet-4-5"])
+})
+
+test("selectAvailableFactorySightModel keeps available requests and falls back to backend models", () => {
+  expect(selectAvailableFactorySightModel("opencode/hy3-free", ["opencode/hy3-free"])).toBe("opencode/hy3-free")
+  expect(selectAvailableFactorySightModel("anthropic/claude-opus-4-8", ["opencode/hy3-free"])).toBe(
+    "opencode/hy3-free",
+  )
+  expect(selectAvailableFactorySightModel("missing/model", ["opencode/big-pickle", "opencode/hy3-free"])).toBe(
+    "opencode/hy3-free",
+  )
+  expect(selectAvailableFactorySightModel("missing/model", ["ollama/deepseek-coder-v2:16b", "opencode/hy3-free"])).toBe(
+    "opencode/hy3-free",
+  )
+  expect(selectAvailableFactorySightModel("missing/model", ["anthropic/claude-opus-4-8", "opencode/hy3-free"])).toBe(
+    "anthropic/claude-opus-4-8",
+  )
+})
+
+test("factorySightModelCandidates orders stable retry candidates before slower backend models", () => {
+  expect(
+    factorySightModelCandidates("missing/model", [
+      "opencode/big-pickle",
+      "opencode/deepseek-v4-flash-free",
+      "opencode/hy3-free",
+    ]),
+  ).toEqual(["opencode/hy3-free", "opencode/deepseek-v4-flash-free"])
+  expect(factorySightModelCandidates("opencode/big-pickle", ["opencode/big-pickle", "opencode/hy3-free"])).toEqual([
+    "opencode/big-pickle",
+    "opencode/hy3-free",
+  ])
+})
+
+test("factorySightPermissionRules maps Remote project permission levels into backend rules", () => {
+  expect(factorySightPermissionRules("full_auto")).toEqual([{ permission: "*", pattern: "*", action: "allow" }])
+  expect(factorySightPermissionRules("ask")).toBeUndefined()
+  expect(factorySightPermissionRules("read_only")).toEqual([
+    { permission: "read", pattern: "*", action: "allow" },
+    { permission: "list", pattern: "*", action: "allow" },
+    { permission: "glob", pattern: "*", action: "allow" },
+    { permission: "grep", pattern: "*", action: "allow" },
+    { permission: "*", pattern: "*", action: "deny" },
+  ])
 })
 
 test("agentsFromFactorySightResponse maps FactorySight agents into Remote profiles", () => {
@@ -124,11 +169,12 @@ test("isSessionWaitUnavailable detects FactorySight wait capability gaps", () =>
   expect(isSessionWaitUnavailable(new Error("provider failed"))).toBe(false)
 })
 
-test("FactorySight timeout errors can fall back to CLI transport", () => {
+test("FactorySight wait timeouts stay on HTTP transport instead of falling back to CLI", () => {
   expect(isFactorySightTransportFallbackError(new Error("Timed out waiting for FactorySight session ses_123"))).toBe(
-    true,
+    false,
   )
   expect(isFactorySightTransportFallbackError(new Error("Session wait is not available yet"))).toBe(false)
+  expect(isFactorySightTransportFallbackError(new Error("Unknown command api"))).toBe(true)
 })
 
 test("withFactorySightTimeout rejects hung wait calls", async () => {

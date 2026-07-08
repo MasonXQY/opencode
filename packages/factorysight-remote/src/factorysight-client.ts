@@ -1,7 +1,7 @@
 import path from "node:path"
 import { spawn } from "node:child_process"
 import { appendEvent, createTask, getState, patchTask, setTaskStatus } from "./store"
-import type { AgentMode, AgentProfile, Project, Task } from "./shared"
+import type { AgentMode, AgentProfile, PermissionLevel, Project, Task } from "./shared"
 import { agentProfiles, defaultAgents, defaultModels, preferredDefaultModel } from "./shared"
 import { availableModels as factorySightCliModels } from "./models"
 import { attachedFileContext, appendDeliverable, runTask as runFactorySightCliTask } from "./runner"
@@ -87,6 +87,43 @@ export function modelsFromFactorySightResponse(response: unknown) {
       : defaultModels
 }
 
+export function selectAvailableFactorySightModel(requested: string, available: string[]) {
+  return factorySightModelCandidates(requested, available)[0] ?? requested
+}
+
+export function factorySightModelCandidates(requested: string, available: string[]) {
+  const unstableFallbackModels = new Set(["opencode/big-pickle", "opencode/minimax-m3-free"])
+  const fallbackAvailable = available.filter((model) => model === requested || !unstableFallbackModels.has(model))
+  const preferred = [
+    requested,
+    preferredDefaultModel,
+    "opencode/hy3-free",
+    "opencode/deepseek-v4-flash-free",
+    "opencode/north-mini-code-free",
+    "opencode/qwen3.6-plus-free",
+  ]
+  const candidates = [
+    ...preferred.filter((model) => fallbackAvailable.includes(model)),
+    ...fallbackAvailable.filter((model) => model.startsWith("opencode/")),
+    ...fallbackAvailable.filter((model) => !model.startsWith("ollama/") && !model.startsWith("local/")),
+    ...fallbackAvailable,
+  ]
+  return [...new Set(candidates)]
+}
+
+export function factorySightPermissionRules(level: PermissionLevel) {
+  if (level === "full_auto") return [{ permission: "*", pattern: "*", action: "allow" }]
+  if (level === "read_only")
+    return [
+      { permission: "read", pattern: "*", action: "allow" },
+      { permission: "list", pattern: "*", action: "allow" },
+      { permission: "glob", pattern: "*", action: "allow" },
+      { permission: "grep", pattern: "*", action: "allow" },
+      { permission: "*", pattern: "*", action: "deny" },
+    ]
+  return undefined
+}
+
 export function factorySightApiArgs(method: string, requestPath: string, body?: unknown) {
   const args = ["api", method.toLowerCase(), requestPath]
   if (body !== undefined) args.push("--data", JSON.stringify(body))
@@ -100,6 +137,11 @@ export function factorySightApiUrl(baseUrl: string, requestPath: string) {
 export function isSessionWaitUnavailable(error: unknown) {
   const message = error instanceof Error ? error.message : String(error)
   return /ServiceUnavailableError|session\.wait|Session wait is not available yet/i.test(message)
+}
+
+function isFactorySightWaitTimeout(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error)
+  return /Timed out waiting for FactorySight session/i.test(message)
 }
 
 function textFromMessageContent(content: unknown) {
@@ -202,16 +244,19 @@ async function factorySightApi(method: string, requestPath: string, body?: unkno
 
 async function waitForFactorySightSession(sessionId: string) {
   const timeoutMs = Number(process.env.FACTORYSIGHT_REMOTE_SESSION_WAIT_MS ?? 15_000)
-  try {
-    await withFactorySightTimeout(
-      factorySightApi("POST", `/api/session/${encodeURIComponent(sessionId)}/wait`),
-      `FactorySight session ${sessionId}`,
-      timeoutMs,
-    )
-    return
-  } catch (error) {
-    if (!isSessionWaitUnavailable(error)) throw error
-  }
+  let waitSucceeded = false
+  let waitError: unknown
+  void withFactorySightTimeout(
+    factorySightApi("POST", `/api/session/${encodeURIComponent(sessionId)}/wait`),
+    `FactorySight session ${sessionId}`,
+    timeoutMs,
+  )
+    .then(() => {
+      waitSucceeded = true
+    })
+    .catch((error) => {
+      waitError = error
+    })
 
   const intervalMs = Number(process.env.FACTORYSIGHT_REMOTE_SESSION_POLL_MS ?? 1_000)
   const deadline = Date.now() + timeoutMs
@@ -221,8 +266,11 @@ async function waitForFactorySightSession(sessionId: string) {
     )
     if (state.status === "completed") return state.text
     if (state.status === "failed") throw new Error(state.text)
+    if (waitSucceeded) return
+    if (waitError && !isSessionWaitUnavailable(waitError) && !isFactorySightWaitTimeout(waitError)) throw waitError
     await new Promise((resolve) => setTimeout(resolve, intervalMs))
   }
+  if (waitError && !isSessionWaitUnavailable(waitError) && !isFactorySightWaitTimeout(waitError)) throw waitError
   throw new Error(`Timed out waiting for FactorySight session ${sessionId}`)
 }
 
@@ -401,14 +449,51 @@ function canFallbackToFactorySightCli(error: unknown) {
 }
 
 export function isFactorySightTransportFallbackError(error: unknown) {
+  return canFallbackToFactorySightCli(error)
+}
+
+function isRetryableFactorySightModelError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error)
-  return canFallbackToFactorySightCli(error) || /Timed out waiting for FactorySight session/i.test(message)
+  return /Timed out waiting for FactorySight session|tool call delta is missing id or name|model .*not found|Provider request failed|Provider API error/i.test(
+    message,
+  )
+}
+
+async function runFactorySightTaskAttempt(task: Task, project: Project, runnerAgent: string, selectedModel: string) {
+  const session = (await factorySightApi("POST", "/api/session", {
+    agent: runnerAgent,
+    model: modelRefFromString(selectedModel),
+    permission: factorySightPermissionRules(project.permissionLevel),
+    location: { directory: project.path },
+  })) as { data?: { id?: string } } | undefined
+  const sessionId = session?.data?.id
+  if (!sessionId) throw new Error("FactorySight did not return a session id")
+  await patchTask(task.id, { sessionId })
+  await appendEvent(task.id, { type: "system", text: `FactorySight session created: ${sessionId}` })
+
+  await factorySightApi("POST", `/api/session/${encodeURIComponent(sessionId)}/prompt`, {
+    prompt: { text: await attachedFileContext(task, project.path) },
+  })
+  await appendEvent(task.id, { type: "system", text: "Prompt sent to FactorySight backend" })
+  const output = await waitForFactorySightSession(sessionId)
+  if (output) await appendEvent(task.id, { type: "runner", text: output })
+  await appendDeliverable(task, project.path, 0)
+  await setTaskStatus(task.id, "completed", "FactorySight backend completed task")
 }
 
 async function runFactorySightTask(task: Task, project: Project) {
   const runnerAgent = runnerAgentFor(task.agent)
-  await setTaskStatus(task.id, "running", `FactorySight backend started ${task.agent} on ${task.model}`)
+  const modelCandidates = factorySightModelCandidates(task.model, await factorySightModels())
+  if (modelCandidates.length === 0) modelCandidates.push(task.model)
+  const selectedModel = modelCandidates[0] ?? task.model
+  await setTaskStatus(task.id, "running", `FactorySight backend started ${task.agent} on ${selectedModel}`)
   await appendEvent(task.id, { type: "runner", text: `Workspace: ${project.path}` })
+  if (selectedModel !== task.model) {
+    await appendEvent(task.id, {
+      type: "system",
+      text: `Requested model ${task.model} is not available in the FactorySight backend. Using ${selectedModel}.`,
+    })
+  }
   if (runnerAgent !== task.agent) {
     await appendEvent(task.id, {
       type: "system",
@@ -416,32 +501,30 @@ async function runFactorySightTask(task: Task, project: Project) {
     })
   }
 
-  try {
-    const session = (await factorySightApi("POST", "/api/session", {
-      agent: runnerAgent,
-      model: modelRefFromString(task.model),
-      location: { directory: project.path },
-    })) as { data?: { id?: string } } | undefined
-    const sessionId = session?.data?.id
-    if (!sessionId) throw new Error("FactorySight did not return a session id")
-    await patchTask(task.id, { sessionId })
-    await appendEvent(task.id, { type: "system", text: `FactorySight session created: ${sessionId}` })
-
-    await factorySightApi("POST", `/api/session/${encodeURIComponent(sessionId)}/prompt`, {
-      prompt: { text: await attachedFileContext(task, project.path) },
-    })
-    await appendEvent(task.id, { type: "system", text: "Prompt sent to FactorySight backend" })
-    const output = await waitForFactorySightSession(sessionId)
-    if (output) await appendEvent(task.id, { type: "runner", text: output })
-    await appendDeliverable(task, project.path, 0)
-    await setTaskStatus(task.id, "completed", "FactorySight backend completed task")
-  } catch (error) {
-    if (!isFactorySightTransportFallbackError(error)) throw error
-    await appendEvent(task.id, {
-      type: "system",
-      text: "FactorySight HTTP transport did not complete this task. Falling back to FactorySight CLI transport.",
-    })
-    await runFactorySightCliTask(task.id)
+  for (const [index, candidate] of modelCandidates.entries()) {
+    try {
+      if (index > 0) {
+        await setTaskStatus(task.id, "running", `Retrying FactorySight backend with ${candidate}`)
+        await appendEvent(task.id, { type: "system", text: `Retrying with backend model ${candidate}.` })
+      }
+      await runFactorySightTaskAttempt(task, project, runnerAgent, candidate)
+      return
+    } catch (error) {
+      if (isFactorySightTransportFallbackError(error)) {
+        await appendEvent(task.id, {
+          type: "system",
+          text: "FactorySight HTTP transport did not complete this task. Falling back to FactorySight CLI transport.",
+        })
+        await runFactorySightCliTask(task.id)
+        return
+      }
+      const hasNextCandidate = index < modelCandidates.length - 1
+      if (!hasNextCandidate || !isRetryableFactorySightModelError(error)) throw error
+      await appendEvent(task.id, {
+        type: "system",
+        text: `Backend model ${candidate} failed: ${error instanceof Error ? error.message : String(error)}`,
+      })
+    }
   }
 }
 

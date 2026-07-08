@@ -118,6 +118,41 @@ describe("SessionV2.prompt", () => {
     }),
   )
 
+  it.effect("joins active recorded Session execution through SessionExecution", () =>
+    Effect.gen(function* () {
+      yield* setup
+      const session = yield* SessionV2.Service
+      executionCalls.length = 0
+      activeSessions.add(sessionID)
+
+      yield* session.wait(sessionID)
+
+      expect(executionCalls).toEqual([sessionID])
+    }).pipe(Effect.ensuring(Effect.sync(() => activeSessions.clear()))),
+  )
+
+  it.effect("returns immediately when waiting for an idle recorded Session", () =>
+    Effect.gen(function* () {
+      yield* setup
+      const session = yield* SessionV2.Service
+      executionCalls.length = 0
+
+      yield* session.wait(sessionID)
+
+      expect(executionCalls).toEqual([])
+    }),
+  )
+
+  it.effect("rejects wait for a missing Session", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionV2.Service
+
+      const failure = yield* session.wait(SessionV2.ID.make("ses_missing_wait")).pipe(Effect.flip)
+
+      expect(failure).toMatchObject({ _tag: "Session.NotFoundError", sessionID: "ses_missing_wait" })
+    }),
+  )
+
   it.effect("delegates process-local interruption through SessionExecution", () =>
     Effect.gen(function* () {
       yield* setup

@@ -72,6 +72,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
               id: ctx.payload.id,
               agent: ctx.payload.agent,
               model: ctx.payload.model,
+              permission: ctx.payload.permission,
               location: ctx.payload.location ?? { directory: AbsolutePath.make(process.cwd()) },
             }),
           }
@@ -205,14 +206,20 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
                 }),
               ),
             ),
-            Effect.catchTag("Session.OperationUnavailableError", (error) =>
-              Effect.fail(
-                new ServiceUnavailableError({
-                  message: `Session ${error.operation} is not available yet`,
-                  service: `session.${error.operation}`,
-                }),
-              ),
-            ),
+            Effect.catch((error) => {
+              const ref = `err_${crypto.randomUUID().slice(0, 8)}`
+              return Effect.logError("failed to wait for session", { cause: error }).pipe(
+                Effect.annotateLogs({ ref, sessionID: ctx.params.sessionID }),
+                Effect.andThen(
+                  Effect.fail(
+                    new UnknownError({
+                      message: "Session execution failed while waiting. Check server logs for details.",
+                      ref,
+                    }),
+                  ),
+                ),
+              )
+            }),
           )
           return HttpApiSchema.NoContent.make()
         }),
