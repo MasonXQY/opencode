@@ -26,6 +26,7 @@ const demoUsers: User[] = [
 
 let state: AppState | undefined
 const subscribers = new Map<string, Set<(event: TaskEvent) => void>>()
+const staleRunningTaskMs = 30 * 60 * 1000
 
 function now() {
   return new Date().toISOString()
@@ -43,6 +44,7 @@ async function ensureLoaded() {
     state = JSON.parse(await readFile(statePath, "utf8")) as AppState
     for (const project of state.projects) project.permissionLevel ??= defaultPermissionLevel
     state.hiddenFactorySightSessionIds ??= []
+    if (reconcileStaleWorkflowTasks(state, new Date())) await save()
     return state
   } catch (error) {
     if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error
@@ -57,6 +59,64 @@ async function ensureLoaded() {
   }
   await save()
   return state
+}
+
+export function reconcileStaleWorkflowTasks(
+  state: AppState,
+  currentTime: Date,
+  staleAfterMs = staleRunningTaskMs,
+) {
+  const terminal = new Set<TaskStatus>(["completed", "failed", "archived"])
+  const byId = new Map(state.tasks.map((task) => [task.id, task]))
+  let changed = 0
+  const failTask = (task: Task, reason: string) => {
+    if (task.status === "failed") return
+    task.status = "failed"
+    task.updatedAt = currentTime.toISOString()
+    const alreadyExplained = task.events.some((event) => event.text === reason)
+    if (!alreadyExplained) {
+      task.events.push({
+        id: `evt_stale_${task.id}`,
+        taskId: task.id,
+        at: task.updatedAt,
+        type: "status",
+        text: reason,
+      })
+    }
+    changed++
+  }
+
+  for (const task of state.tasks) {
+    if (task.status !== "running" && task.status !== "queued") continue
+    const parent = task.parentTaskId ? byId.get(task.parentTaskId) : undefined
+    if (parent && terminal.has(parent.status)) {
+      failTask(task, `Parent workflow already ${parent.status}; marking stale task as failed.`)
+      continue
+    }
+    if (task.status === "running" && !task.sessionId && !task.runnerPid) {
+      const age = currentTime.getTime() - Date.parse(task.updatedAt)
+      if (age >= staleAfterMs) failTask(task, "No active backend session remains for this running task.")
+    }
+  }
+
+  for (const task of state.tasks) {
+    if (task.kind !== "orchestration" || task.status !== "running") continue
+    const children = (task.childTaskIds ?? [])
+      .map((childId) => byId.get(childId))
+      .filter((child): child is Task => Boolean(child))
+    if (!children.length) continue
+    if (children.every((child) => child.status === "completed")) {
+      task.status = "completed"
+      task.updatedAt = currentTime.toISOString()
+      changed++
+    } else if (children.some((child) => child.status === "failed")) {
+      task.status = "failed"
+      task.updatedAt = currentTime.toISOString()
+      changed++
+    }
+  }
+
+  return changed
 }
 
 async function save() {
