@@ -84,6 +84,9 @@ type SpeechRecognitionLike = {
 }
 type SpeechRecognitionConstructor = new () => SpeechRecognitionLike
 
+const flowNodeWidth = 228
+const flowNodeHeight = 154
+
 const productStyles = [
   {
     id: "linear",
@@ -162,8 +165,6 @@ function buildProjectFlow(input: {
   artifactToken: string | undefined
   fileUrl: (file: FileAttachment) => string
 }): ProjectFlow {
-  const nodeWidth = 228
-  const nodeHeight = 154
   const columnGap = 290
   const rowGap = 188
   const canvasPad = 120
@@ -200,9 +201,9 @@ function buildProjectFlow(input: {
   const rowsInLargestColumn = Math.max(1, Math.min(maxRowsPerColumn, children.length || 1))
   const graphHeight = Math.max(
     620,
-    canvasPad * 2 + rowsInLargestColumn * nodeHeight + (rowsInLargestColumn - 1) * rowGap,
+    canvasPad * 2 + rowsInLargestColumn * flowNodeHeight + (rowsInLargestColumn - 1) * rowGap,
   )
-  const centerY = Math.round(graphHeight / 2 - nodeHeight / 2)
+  const centerY = Math.round(graphHeight / 2 - flowNodeHeight / 2)
   const inputNode: FlowNode = {
     id: "flow-input",
     kind: "input",
@@ -244,7 +245,7 @@ function buildProjectFlow(input: {
       const column = Math.floor(index / maxRowsPerColumn)
       const row = index % maxRowsPerColumn
       const rowsInColumn = Math.min(maxRowsPerColumn, children.length - column * maxRowsPerColumn)
-      const columnHeight = rowsInColumn * nodeHeight + (rowsInColumn - 1) * (rowGap - nodeHeight)
+      const columnHeight = rowsInColumn * flowNodeHeight + (rowsInColumn - 1) * (rowGap - flowNodeHeight)
       const startY = Math.round(graphHeight / 2 - columnHeight / 2)
       nodes.push({
         id: task.id,
@@ -304,9 +305,22 @@ function buildProjectFlow(input: {
   return {
     nodes,
     edges,
-    width: outputX + nodeWidth + canvasPad,
+    width: outputX + flowNodeWidth + canvasPad,
     height: graphHeight,
   }
+}
+
+function flowContentBounds(flow: ProjectFlow) {
+  if (!flow.nodes.length) return { left: 0, top: 0, right: flow.width, bottom: flow.height }
+  return flow.nodes.reduce(
+    (bounds, node) => ({
+      left: Math.min(bounds.left, node.x),
+      top: Math.min(bounds.top, node.y),
+      right: Math.max(bounds.right, node.x + flowNodeWidth),
+      bottom: Math.max(bounds.bottom, node.y + flowNodeHeight),
+    }),
+    { left: Number.POSITIVE_INFINITY, top: Number.POSITIVE_INFINITY, right: 0, bottom: 0 },
+  )
 }
 
 function applyNodePositions(flow: ProjectFlow, positions: Record<string, NodePosition>): ProjectFlow {
@@ -1212,6 +1226,22 @@ function WorkflowCanvas(props: {
   let panStartY = 0
   let panStartScrollLeft = 0
   let panStartScrollTop = 0
+  let lastFocusedTaskId: string | undefined
+  const centerWorkflow = (behavior: ScrollBehavior = "smooth") =>
+    requestAnimationFrame(() => {
+      const viewport = nodeViewport
+      if (!viewport) return
+      const currentFlow = flow()
+      const bounds = flowContentBounds(currentFlow)
+      const currentZoom = zoom()
+      const viewportWidth = viewport.clientWidth
+      const viewportHeight = viewport.clientHeight
+      const centerX = ((bounds.left + bounds.right) / 2) * currentZoom
+      const centerY = ((bounds.top + bounds.bottom) / 2) * currentZoom
+      const left = Math.max(0, centerX - viewportWidth / 2)
+      const top = Math.max(0, centerY - viewportHeight / 2)
+      viewport.scrollTo({ left, top, behavior })
+    })
   const setZoomAroundPoint = (nextZoom: number, clientX: number, clientY: number) => {
     const viewport = nodeViewport
     if (!viewport) {
@@ -1366,13 +1396,13 @@ function WorkflowCanvas(props: {
   const fitCanvas = () => {
     const nextZoom = flow().width > 1500 || flow().height > 740 ? 0.72 : 0.86
     setZoom(nextZoom)
-    requestAnimationFrame(() => nodeViewport?.scrollTo({ left: 0, top: 0, behavior: "smooth" }))
+    centerWorkflow()
   }
   const autoLayout = () => {
     const nextZoom = flow().width > 1500 || flow().height > 740 ? 0.72 : 0.86
     setManualPositions({})
     setZoom(nextZoom)
-    requestAnimationFrame(() => nodeViewport?.scrollTo({ left: 0, top: 0, behavior: "smooth" }))
+    centerWorkflow()
   }
 
   createEffect(() => {
@@ -1385,12 +1415,15 @@ function WorkflowCanvas(props: {
   createEffect(() => {
     const current = baseFlow()
     setZoom(current.width > 1500 || current.height > 740 ? 0.72 : 0.86)
-    requestAnimationFrame(() => nodeViewport?.scrollTo({ left: 0, top: 0 }))
+    centerWorkflow("auto")
   })
 
   createEffect(() => {
-    props.selectedTaskId
-    if (props.selectedTask) focusSelectedNode()
+    const taskId = props.selectedTaskId
+    if (!taskId || taskId === lastFocusedTaskId) return
+    const shouldFocus = lastFocusedTaskId !== undefined
+    lastFocusedTaskId = taskId
+    if (shouldFocus && props.selectedTask) focusSelectedNode()
   })
 
   const hasWorkflow = createMemo(() => Boolean(props.project && props.tasks.length))

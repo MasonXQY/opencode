@@ -912,6 +912,7 @@ label {
   min-width: 1460px;
   height: 620px;
   min-height: 620px;
+  margin: auto;
   display: block;
   padding: 0;
   transform-origin: left top;
